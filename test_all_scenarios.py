@@ -76,6 +76,19 @@ def test_channel_creation():
     except Exception as e:
         tests.append(("❌", "Random CPTP (2 qubits)", str(e)))
 
+    # 3-кубитные каналы
+    try:
+        ch = DepolarizingChannel(p=0.1, n_qubits=3)
+        tests.append(("✅", "Depolarizing (3 qubits, p=0.1)", f"Kraus ops: {len(ch.get_kraus_operators())}"))
+    except Exception as e:
+        tests.append(("❌", "Depolarizing (3 qubits, p=0.1)", str(e)))
+
+    try:
+        ch = random_cptp_channel(n_qubits=3, seed=42)
+        tests.append(("✅", "Random CPTP (3 qubits)", f"Kraus ops: {len(ch.get_kraus_operators())}"))
+    except Exception as e:
+        tests.append(("❌", "Random CPTP (3 qubits)", str(e)))
+
     # Вывод результатов
     for status, name, info in tests:
         print(f"{status} {name:45s} | {info}")
@@ -148,6 +161,47 @@ def test_qpt_two_qubit():
             quality = analyze_tomography_quality(result)
 
             status = "✅" if fidelity >= expected_fidelity - 0.15 else "⚠️"
+            results.append((
+                status,
+                name,
+                f"Fidelity: {fidelity:.4f}",
+                f"CPTP: {quality['is_cptp']}",
+                f"Rank: {quality['kraus_rank']}"
+            ))
+        except Exception as e:
+            results.append(("❌", name, str(e)[:50], "", ""))
+
+    for res in results:
+        if len(res) == 5:
+            print(f"{res[0]} {res[1]:35s} | {res[2]} | {res[3]} | {res[4]}")
+        else:
+            print(f"{res[0]} {res[1]:35s} | {res[2]}")
+
+    passed = sum(1 for r in results if r[0] in ["✅", "⚠️"])
+    print(f"\nРезультат: {passed}/{len(results)} тестов пройдено")
+    return passed == len(results)
+
+
+def test_qpt_three_qubit():
+    """Тест 3.5: QPT для 3-кубитных каналов"""
+    print_separator("ТЕСТ 3.5: QPT для 3-кубитных каналов")
+
+    configs = [
+        ("Depolarizing p=0.1", DepolarizingChannel(p=0.1, n_qubits=3), 0.70),
+    ]
+
+    results = []
+
+    for name, channel, expected_fidelity in configs:
+        try:
+            print(f"   Запуск {name}... (это может занять несколько минут)")
+            qpt = QuantumProcessTomography(n_qubits=3, shots=3000)
+            result = qpt.run_tomography(channel, reconstruction_method='LSQ')
+
+            fidelity = result.process_fidelity
+            quality = analyze_tomography_quality(result)
+
+            status = "✅" if fidelity >= expected_fidelity - 0.20 else "⚠️"
             results.append((
                 status,
                 name,
@@ -432,6 +486,7 @@ def main():
         ("Создание каналов", test_channel_creation),
         ("QPT 1-кубит", test_qpt_single_qubit),
         ("QPT 2-кубита", test_qpt_two_qubit),
+        ("QPT 3-кубита", test_qpt_three_qubit),  # Опционально, может быть медленным
         ("Методы реконструкции", test_reconstruction_methods),
         ("Влияние шума", test_noise_effects),
         ("Представления", test_representations),

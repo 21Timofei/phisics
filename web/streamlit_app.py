@@ -104,6 +104,8 @@ def create_channel(channel_type, params, n_qubits):
         p = params.get('p', 0.1)
         return TwoQubitDepolarizing(p)
 
+    # Для 3 кубитов DepolarizingChannel уже поддерживает n_qubits=3
+
     elif channel_type == 'Random CPTP':
         seed = params.get('seed', None)
         return random_cptp_channel(n_qubits, seed=seed)
@@ -338,15 +340,20 @@ def main():
 
         # 1. Выбор числа кубитов
         st.subheader("1️⃣ Число кубитов")
-        n_qubits = st.selectbox("Выберите число кубитов", [1, 2], index=0)
+        n_qubits = st.selectbox("Выберите число кубитов", [1, 2, 3], index=0)
+
+        if n_qubits == 3:
+            st.warning("⚠️ 3-кубитные системы требуют больше ресурсов и времени вычислений")
 
         # 2. Выбор канала
         st.subheader("2️⃣ Квантовый канал")
 
         if n_qubits == 1:
             channel_types = ['Depolarizing', 'Amplitude Damping', 'Phase Damping', 'Random CPTP']
-        else:
+        elif n_qubits == 2:
             channel_types = ['Depolarizing', 'Two-Qubit Depolarizing', 'Random CPTP']
+        else:  # n_qubits == 3
+            channel_types = ['Depolarizing', 'Random CPTP']
 
         channel_type = st.selectbox("Тип канала", channel_types)
 
@@ -354,9 +361,12 @@ def main():
         channel_params = {}
 
         if channel_type == 'Depolarizing':
-            p = st.slider("Параметр p (вероятность деполяризации)", 0.0, 0.75 if n_qubits == 1 else 0.5, 0.1, 0.01)
+            max_p = 0.75 if n_qubits == 1 else (0.5 if n_qubits == 2 else 0.3)
+            p = st.slider("Параметр p (вероятность деполяризации)", 0.0, max_p, 0.1, 0.01)
             channel_params['p'] = p
+            num_kraus = 4 ** n_qubits
             st.info(f"💡 Depolarizing: E(ρ) = (1-p)ρ + p·I/{2**n_qubits}")
+            st.caption(f"Генерируется {num_kraus} операторов Крауса (4^{n_qubits})")
 
         elif channel_type == 'Amplitude Damping':
             gamma = st.slider("Параметр γ (затухание амплитуды)", 0.0, 1.0, 0.3, 0.01)
@@ -382,7 +392,13 @@ def main():
 
         # 3. Параметры томографии
         st.subheader("3️⃣ Томография")
-        shots = st.number_input("Число измерений (shots)", min_value=100, max_value=100000, value=1000, step=100)
+        # Для 3 кубитов нужно больше shots для точности
+        default_shots = 1000 if n_qubits <= 2 else 3000
+        max_shots = 100000 if n_qubits <= 2 else 50000  # Ограничение для 3 кубитов
+        shots = st.number_input("Число измерений (shots)", min_value=100, max_value=max_shots, value=default_shots, step=100)
+
+        if n_qubits == 3:
+            st.info(f"💡 Для 3 кубитов рекомендуется минимум 3000 shots для приемлемой точности")
 
         st.subheader("4️⃣ Шум измерений")
         add_noise = st.checkbox("Добавить ошибки считывания", value=False)
@@ -502,13 +518,13 @@ def main():
             st.subheader("Матрица Чой")
             choi = result.reconstructed_channel.get_choi_matrix()
             fig_choi = plot_choi_matrix(choi)
-            st.plotly_chart(fig_choi, use_container_width=True)
+            st.plotly_chart(fig_choi, width='stretch')
 
             # Операторы Крауса
             st.subheader("Операторы Крауса")
             kraus_ops = result.reconstructed_channel.get_kraus_operators()
             fig_kraus = plot_kraus_operators(kraus_ops)
-            st.plotly_chart(fig_kraus, use_container_width=True)
+            st.plotly_chart(fig_kraus, width='stretch')
 
             # Детали операторов Крауса
             with st.expander("🔍 Детали операторов Крауса"):
@@ -517,23 +533,25 @@ def main():
                     col_a, col_b = st.columns(2)
                     with col_a:
                         st.text("Действительная часть:")
-                        st.dataframe(pd.DataFrame(np.real(K)), use_container_width=True)
+                        st.dataframe(pd.DataFrame(np.real(K)), width='stretch')
                     with col_b:
                         st.text("Мнимая часть:")
-                        st.dataframe(pd.DataFrame(np.imag(K)), use_container_width=True)
+                        st.dataframe(pd.DataFrame(np.imag(K)), width='stretch')
 
             # PTM
             st.subheader("Pauli Transfer Matrix")
             fig_ptm = plot_ptm_matrix(result.reconstructed_channel)
             if fig_ptm:
-                st.plotly_chart(fig_ptm, use_container_width=True)
+                st.plotly_chart(fig_ptm, width='stretch')
 
             # Блох-сфера (только для 1 кубита)
             if n_qubits == 1:
                 st.subheader("3D представление на сфере Блоха")
                 fig_bloch = plot_bloch_sphere_trajectory(result.reconstructed_channel)
                 if fig_bloch:
-                    st.plotly_chart(fig_bloch, use_container_width=True)
+                    st.plotly_chart(fig_bloch, width='stretch')
+            elif n_qubits == 3:
+                st.info("ℹ️ Визуализация сферы Блоха доступна только для 1-кубитных систем")
 
         with tabs[1]:
             st.markdown("### Аналитика и сравнение")
@@ -561,7 +579,7 @@ def main():
                         'Относительная ошибка (%)': [abs(true_val - est_val) / true_val * 100 if true_val > 0 else 0]
                     })
 
-                    st.dataframe(comp_df, use_container_width=True)
+                    st.dataframe(comp_df, width='stretch')
 
                     # График сравнения
                     fig_comp = go.Figure(data=[
@@ -573,7 +591,7 @@ def main():
                         yaxis_title="Значение",
                         height=400
                     )
-                    st.plotly_chart(fig_comp, use_container_width=True)
+                    st.plotly_chart(fig_comp, width='stretch')
 
                 except Exception as e:
                     st.warning(f"Не удалось оценить параметры: {e}")
@@ -590,13 +608,13 @@ def main():
                 ],
                 'Значение': [
                     f"{result.process_fidelity:.6f}",
-                    quality['n_kraus_operators'],
-                    quality['kraus_rank'],
+                    str(quality['n_kraus_operators']),
+                    str(quality['kraus_rank']),
                     f"{quality['tp_error']:.2e}",
                     "Да" if quality['is_cptp'] else "Нет"
                 ]
             })
-            st.dataframe(info_df, use_container_width=True)
+            st.dataframe(info_df, width='stretch')
 
         with tabs[2]:
             if show_protocol:
@@ -621,9 +639,9 @@ def main():
                 st.subheader("Параметры измерений")
                 meas_info = pd.DataFrame({
                     'Параметр': ['Shots', 'Базис измерений', 'Ошибка считывания', 'Метод реконструкции'],
-                    'Значение': [shots, 'Pauli basis', f"{readout_error:.3f}" if add_noise else "0.000", method]
+                    'Значение': [str(shots), 'Pauli basis', f"{readout_error:.3f}" if add_noise else "0.000", method]
                 })
-                st.dataframe(meas_info, use_container_width=True)
+                st.dataframe(meas_info, width='stretch')
 
                 # Этапы реконструкции
                 st.subheader("Этапы реконструкции")
@@ -681,7 +699,7 @@ def main():
             yaxis_title="Частота",
             height=400
         )
-        st.plotly_chart(fig_hist, use_container_width=True)
+        st.plotly_chart(fig_hist, width='stretch')
 
         # Временной ряд
         st.subheader("Эволюция Fidelity по прогонам")
@@ -706,7 +724,7 @@ def main():
             yaxis_title="Process Fidelity",
             height=400
         )
-        st.plotly_chart(fig_ts, use_container_width=True)
+        st.plotly_chart(fig_ts, width='stretch')
 
         # Статистика
         st.subheader("Детальная статистика")
@@ -728,7 +746,7 @@ def main():
                 '-'
             ]
         })
-        st.dataframe(stats_df, use_container_width=True)
+        st.dataframe(stats_df, width='stretch')
 
         # Дополнительная информация о Kraus rank
         st.info(f"Наиболее частый Kraus Rank (мода): {stats['kraus_rank']['mode']}")

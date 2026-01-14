@@ -68,39 +68,51 @@ class DepolarizingChannel(KrausChannel):
             ]
 
         else:
-            # Многокубитный случай: используем тензорное произведение
-            # Для 2 кубитов генерируем все 16 операторов
+            # Многокубитный случай: ПРАВИЛЬНАЯ модель depolarizing канала
+            # ε(ρ) = (1-p)ρ + p·I/2^n
+            #
+            # Операторы Крауса:
+            # K_0 = √(1 - p(4^n-1)/4^n) · I
+            # K_i = √(p/4^n) · P_i  для всех паули-строк P_i (i=1...4^n-1)
 
-            I = np.eye(2, dtype=np.complex128)
-            X = np.array([[0, 1], [1, 0]], dtype=np.complex128)
-            Y = np.array([[0, -1j], [1j, 0]], dtype=np.complex128)
-            Z = np.array([[1, 0], [0, -1]], dtype=np.complex128)
+            from itertools import product
 
-            # Параметр для каждого кубита (приближение)
-            p_eff = p / n_qubits
-            p_eff = min(p_eff, 0.5)  # Ограничение для стабильности
+            dim = 2 ** n_qubits
+            num_paulis = 4 ** n_qubits
 
-            single_kraus = [
-                np.sqrt(1 - 3*p_eff/4) * I,
-                np.sqrt(p_eff/4) * X,
-                np.sqrt(p_eff/4) * Y,
-                np.sqrt(p_eff/4) * Z
+            # Правильные коэффициенты для depolarizing канала
+            c0 = np.sqrt(1 - p * (num_paulis - 1) / num_paulis)
+            c_pauli = np.sqrt(p / num_paulis)
+
+            # Базисные матрицы Паули для 1 кубита
+            paulis_1q = [
+                np.eye(2, dtype=np.complex128),  # I
+                np.array([[0, 1], [1, 0]], dtype=np.complex128),  # X
+                np.array([[0, -1j], [1j, 0]], dtype=np.complex128),  # Y
+                np.array([[1, 0], [0, -1]], dtype=np.complex128),  # Z
             ]
 
-            # Создаем тензорное произведение
-            # Начинаем с первого кубита
-            kraus_ops = single_kraus.copy()
+            # Генерируем все паули-строки через тензорное произведение
+            kraus_ops = []
 
-            # Добавляем остальные кубиты
-            for _ in range(1, n_qubits):
-                new_kraus = []
-                for K1 in kraus_ops:
-                    for K2 in single_kraus:
-                        new_kraus.append(np.kron(K1, K2))
-                kraus_ops = new_kraus
+            for idx, combo in enumerate(product(range(4), repeat=n_qubits)):
+                # Строим паули-строку для этой комбинации
+                pauli_string = paulis_1q[combo[0]]
+                for qubit_idx in combo[1:]:
+                    pauli_string = np.kron(pauli_string, paulis_1q[qubit_idx])
+
+                # Первый оператор (Identity) с коэффициентом c0
+                if idx == 0:
+                    kraus_ops.append(c0 * pauli_string)
+                else:
+                    # Остальные операторы с коэффициентом c_pauli
+                    kraus_ops.append(c_pauli * pauli_string)
+
+            # Проверка: должно быть 4^n операторов
+            assert len(kraus_ops) == num_paulis, f"Expected {num_paulis} Kraus operators, got {len(kraus_ops)}"
 
         super().__init__(kraus_ops, n_qubits=n_qubits,
-                        name=f"Depolarizing(p={p:.4f})", validate=False)
+                        name=f"Depolarizing(p={p:.4f})", validate=True)
 
 
 class AmplitudeDampingChannel(KrausChannel):

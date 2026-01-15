@@ -102,7 +102,27 @@ def create_channel(channel_type, params, n_qubits):
 
     elif channel_type == 'Two-Qubit Depolarizing' and n_qubits == 2:
         p = params.get('p', 0.1)
-        return TwoQubitDepolarizing(p)
+
+        # Проверяем модель корреляций
+        correlation_model = params.get('correlation_model', 'symmetric')
+
+        if correlation_model == 'asymmetric':
+            from noiselab.channels.two_qubit_noise import GeneralCorrelatedNoise
+            p1 = params.get('p1', 0.05)
+            p2 = params.get('p2', 0.05)
+            p_corr = params.get('p_corr', 0.01)
+            return GeneralCorrelatedNoise.asymmetric_depolarizing(p1, p2, p_corr)
+
+        elif correlation_model == 'general':
+            from noiselab.channels.two_qubit_noise import GeneralCorrelatedNoise
+            # Используем случайные параметры для демонстрации
+            import numpy as np
+            error_probs = np.random.dirichlet(np.ones(16)) * p
+            return GeneralCorrelatedNoise(error_probabilities=error_probs.reshape(4, 4))
+
+        else:
+            # Symmetric (по умолчанию)
+            return TwoQubitDepolarizing(p)
 
     # Для 3 кубитов DepolarizingChannel уже поддерживает n_qubits=3
 
@@ -383,6 +403,23 @@ def main():
             channel_params['p'] = p
             st.info("💡 Two-qubit depolarizing channel")
 
+            # Выбор модели корреляций
+            correlation_model = st.selectbox("Модель корреляций", ['Symmetric', 'Asymmetric', 'General'])
+            if correlation_model == 'Asymmetric':
+                p1 = st.slider("Параметр p1 (кубит 1)", 0.0, 0.5, 0.05, 0.01)
+                p2 = st.slider("Параметр p2 (кубит 2)", 0.0, 0.5, 0.05, 0.01)
+                p_corr = st.slider("Корреляция p_corr", 0.0, 0.2, 0.01, 0.01)
+                channel_params['correlation_model'] = 'asymmetric'
+                channel_params['p1'] = p1
+                channel_params['p2'] = p2
+                channel_params['p_corr'] = p_corr
+            elif correlation_model == 'General':
+                st.info("💡 Полная параметризация 16 паули-ошибок")
+                # Используем случайные параметры для General модели
+                channel_params['correlation_model'] = 'general'
+            else:
+                channel_params['correlation_model'] = 'symmetric'
+
         elif channel_type == 'Random CPTP':
             use_seed = st.checkbox("Использовать seed", value=False)
             if use_seed:
@@ -407,7 +444,42 @@ def main():
             readout_error = st.slider("Ошибка считывания", 0.0, 0.1, 0.01, 0.001)
 
         st.subheader("5️⃣ Алгоритм")
-        method = st.selectbox("Метод реконструкции", ['LSQ', 'MLE'])
+        method = st.selectbox("Метод реконструкции", ['LSQ', 'MLE', 'Tikhonov', 'MaxEntropy', 'L1'])
+
+        # Параметры регуляризации
+        regularization_lambda = None
+        if method in ['Tikhonov', 'L1']:
+            use_auto_lambda = st.checkbox("Автоматический выбор λ", value=True)
+            if not use_auto_lambda:
+                regularization_lambda = st.slider("Параметр регуляризации λ", 0.0001, 1.0, 0.01, 0.0001, format="%.4f")
+            else:
+                st.info("💡 λ будет выбран через кросс-валидацию")
+
+        # Выбор режима измерений
+        st.subheader("6️⃣ Измерения")
+        measurement_selection = st.selectbox(
+            "Режим измерений",
+            ['full', 'minimal', 'random', 'optimized'],
+            help="full: все базисы, minimal: минимальный набор, random: случайный выбор, optimized: оптимизация по condition number"
+        )
+
+        subset_size = None
+        if measurement_selection in ['random', 'optimized']:
+            # Вычисляем общее число базисов
+            n_bases = 4 ** n_qubits
+            subset_size = st.slider(
+                "Число базисов",
+                min_value=3 ** n_qubits + 1,  # Минимум
+                max_value=n_bases,
+                value=n_bases // 2
+            )
+
+        # Исключение базисов
+        exclude_bases = st.multiselect(
+            "Исключить базисы (опционально)",
+            [],  # Будет заполнено динамически
+            help="Исключить определённые базисы из измерений"
+        )
 
         st.markdown("---")
 
@@ -448,7 +520,11 @@ def main():
                         true_channel,
                         reconstruction_method=method,
                         add_measurement_noise=add_noise,
-                        readout_error=readout_error
+                        readout_error=readout_error,
+                        measurement_selection=measurement_selection,
+                        excluded_bases=exclude_bases if exclude_bases else None,
+                        subset_size=subset_size,
+                        regularization_lambda=regularization_lambda
                     )
 
                     # Анализ качества
@@ -463,7 +539,13 @@ def main():
 
                 else:
                     # Множественные прогоны
-                    results = qpt.run_multiple_tomographies(true_channel, n_runs=n_runs)
+                    # Примечание: run_multiple_tomographies не поддерживает все новые параметры
+                    # Используем базовые параметры
+                    results = qpt.run_multiple_tomographies(
+                        true_channel,
+                        n_runs=n_runs,
+                        reconstruction_method=method
+                    )
                     stats = statistical_analysis_multiple_runs(results)
 
                     st.session_state['results_multiple'] = results

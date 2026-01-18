@@ -401,24 +401,9 @@ def main():
         elif channel_type == 'Two-Qubit Depolarizing':
             p = st.slider("Параметр p (2-кубитная деполяризация)", 0.0, 0.5, 0.1, 0.01)
             channel_params['p'] = p
-            st.info("💡 Two-qubit depolarizing channel")
-
-            # Выбор модели корреляций
-            correlation_model = st.selectbox("Модель корреляций", ['Symmetric', 'Asymmetric', 'General'])
-            if correlation_model == 'Asymmetric':
-                p1 = st.slider("Параметр p1 (кубит 1)", 0.0, 0.5, 0.05, 0.01)
-                p2 = st.slider("Параметр p2 (кубит 2)", 0.0, 0.5, 0.05, 0.01)
-                p_corr = st.slider("Корреляция p_corr", 0.0, 0.2, 0.01, 0.01)
-                channel_params['correlation_model'] = 'asymmetric'
-                channel_params['p1'] = p1
-                channel_params['p2'] = p2
-                channel_params['p_corr'] = p_corr
-            elif correlation_model == 'General':
-                st.info("💡 Полная параметризация 16 паули-ошибок")
-                # Используем случайные параметры для General модели
-                channel_params['correlation_model'] = 'general'
-            else:
-                channel_params['correlation_model'] = 'symmetric'
+            channel_params['correlation_model'] = 'symmetric'
+            st.info("💡 Симметричный 2-кубитный деполяризующий канал")
+            st.caption(f"Генерируется 16 операторов Крауса (паули-строки)")
 
         elif channel_type == 'Random CPTP':
             use_seed = st.checkbox("Использовать seed", value=False)
@@ -444,42 +429,13 @@ def main():
             readout_error = st.slider("Ошибка считывания", 0.0, 0.1, 0.01, 0.001)
 
         st.subheader("5️⃣ Алгоритм")
-        method = st.selectbox("Метод реконструкции", ['LSQ', 'MLE', 'Tikhonov', 'MaxEntropy', 'L1'])
+        method = st.selectbox("Метод реконструкции", ['LSQ', 'MLE'])
 
-        # Параметры регуляризации
-        regularization_lambda = None
-        if method in ['Tikhonov', 'L1']:
-            use_auto_lambda = st.checkbox("Автоматический выбор λ", value=True)
-            if not use_auto_lambda:
-                regularization_lambda = st.slider("Параметр регуляризации λ", 0.0001, 1.0, 0.01, 0.0001, format="%.4f")
-            else:
-                st.info("💡 λ будет выбран через кросс-валидацию")
+        if method == 'LSQ':
+            st.info("💡 Линейная инверсия (Least Squares) - быстрый метод")
+        elif method == 'MLE':
+            st.info("💡 Максимальное правдоподобие - гарантирует CPTP")
 
-        # Выбор режима измерений
-        st.subheader("6️⃣ Измерения")
-        measurement_selection = st.selectbox(
-            "Режим измерений",
-            ['full', 'minimal', 'random', 'optimized'],
-            help="full: все базисы, minimal: минимальный набор, random: случайный выбор, optimized: оптимизация по condition number"
-        )
-
-        subset_size = None
-        if measurement_selection in ['random', 'optimized']:
-            # Вычисляем общее число базисов
-            n_bases = 4 ** n_qubits
-            subset_size = st.slider(
-                "Число базисов",
-                min_value=3 ** n_qubits + 1,  # Минимум
-                max_value=n_bases,
-                value=n_bases // 2
-            )
-
-        # Исключение базисов
-        exclude_bases = st.multiselect(
-            "Исключить базисы (опционально)",
-            [],  # Будет заполнено динамически
-            help="Исключить определённые базисы из измерений"
-        )
 
         st.markdown("---")
 
@@ -520,11 +476,7 @@ def main():
                         true_channel,
                         reconstruction_method=method,
                         add_measurement_noise=add_noise,
-                        readout_error=readout_error,
-                        measurement_selection=measurement_selection,
-                        excluded_bases=exclude_bases if exclude_bases else None,
-                        subset_size=subset_size,
-                        regularization_lambda=regularization_lambda
+                        readout_error=readout_error
                     )
 
                     # Анализ качества

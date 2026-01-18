@@ -346,38 +346,6 @@ class TwoQubitGates:
         return QuantumGate(matrix, name="iSWAP", validate=False)
 
 
-class ThreeQubitGates:
-    """Трёхкубитные гейты"""
-
-    @staticmethod
-    def toffoli() -> QuantumGate:
-        """
-        Toffoli gate (CCNOT): NOT на target, если оба control = |1⟩
-        Используется для классических вычислений
-        """
-        matrix = np.eye(8, dtype=np.complex128)
-        # Меняем только последние два базисных состояния |110⟩ ↔ |111⟩
-        matrix[6, 6] = 0
-        matrix[6, 7] = 1
-        matrix[7, 6] = 1
-        matrix[7, 7] = 0
-        return QuantumGate(matrix, name="Toffoli", validate=False)
-
-    @staticmethod
-    def fredkin() -> QuantumGate:
-        """
-        Fredkin gate (CSWAP): SWAP двух кубитов, если control = |1⟩
-        """
-        matrix = np.eye(8, dtype=np.complex128)
-        # SWAP только для |1⟩ на первом кубите
-        # |101⟩ ↔ |110⟩
-        matrix[5, 5] = 0
-        matrix[5, 6] = 1
-        matrix[6, 5] = 1
-        matrix[6, 6] = 0
-        return QuantumGate(matrix, name="Fredkin", validate=False)
-
-
 # Удобные алиасы для часто используемых гейтов
 X = PauliGates.pauli_x
 Y = PauliGates.pauli_y
@@ -395,6 +363,3 @@ U3 = RotationGates.u3
 CNOT = TwoQubitGates.cnot
 CZ = TwoQubitGates.cz
 SWAP = TwoQubitGates.swap
-
-Toffoli = ThreeQubitGates.toffoli
-Fredkin = ThreeQubitGates.fredkin

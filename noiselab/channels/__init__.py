@@ -12,10 +12,10 @@ from .noise_models import (
 )
 from .two_qubit_noise import (
     TwoQubitDepolarizing,
-    CorrelatedNoise,
-    CrosstalkChannel
+    CrosstalkChannel,
+    GeneralCorrelatedNoise
 )
-from .random import random_cptp_channel, random_unitary_channel
+from .random import random_cptp_channel
 
 __all__ = [
     'QuantumChannel',
@@ -28,8 +28,7 @@ __all__ = [
     'GeneralizedAmplitudeDamping',
     'ThermalRelaxationChannel',
     'TwoQubitDepolarizing',
-    'CorrelatedNoise',
     'CrosstalkChannel',
-    'random_cptp_channel',
-    'random_unitary_channel'
+    'GeneralCorrelatedNoise',
+    'random_cptp_channel'
 ]

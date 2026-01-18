@@ -2,8 +2,7 @@
 from .fidelity import (
     process_fidelity,
     process_fidelity_choi,
-    average_gate_fidelity,
-    entanglement_fidelity
+    average_gate_fidelity
 )
 from .distance import (
     diamond_distance,
@@ -20,7 +19,6 @@ __all__ = [
     'process_fidelity',
     'process_fidelity_choi',
     'average_gate_fidelity',
-    'entanglement_fidelity',
     'diamond_distance',
     'trace_distance_channels',
     'frobenius_distance',

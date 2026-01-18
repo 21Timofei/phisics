@@ -101,51 +101,6 @@ def average_gate_fidelity(channel1, channel2) -> float:
     return F_avg
 
 
-def entanglement_fidelity(channel1, channel2,
-                          pure_state=None) -> float:
-    """
-    Entanglement fidelity для конкретного состояния
-
-    F_e = ⟨Φ|(ε₁ ⊗ I)(ε₂ ⊗ I)(|Φ⟩⟨Φ|)|Φ⟩
-
-    где |Φ⟩ - запутанное состояние (обычно |Φ⁺⟩)
-
-    Измеряет насколько хорошо канал сохраняет запутанность
-
-    Args:
-        channel1: Идеальный канал
-        channel2: Реальный канал
-        pure_state: Чистое состояние (если None, используется |Φ⁺⟩)
-
-    Returns:
-        Entanglement fidelity
-    """
-    from ..core.states import QuantumState, DensityMatrix
-
-    d = 2 ** channel1.n_qubits
-
-    # Максимально запутанное состояние |Φ⁺⟩ = Σᵢ|i⟩|i⟩/√d
-    if pure_state is None:
-        phi_plus = np.zeros(d ** 2, dtype=np.complex128)
-        for i in range(d):
-            phi_plus[i * d + i] = 1.0
-        phi_plus /= np.sqrt(d)
-        pure_state = QuantumState(phi_plus, normalize=False)
-
-    rho = pure_state.to_density_matrix()
-
-    # Применяем каналы (расширение на удвоенную систему)
-    # Упрощение: используем Choi representation
-    choi1 = channel1.get_choi_matrix()
-    choi2 = channel2.get_choi_matrix()
-
-    # Fidelity между Choi matrices (упрощённая версия)
-    # F_e = Tr(ρ (J₁† J₂))
-    fidelity = np.trace(rho.matrix @ (choi1.conj().T @ choi2)).real
-
-    return np.clip(fidelity, 0.0, 1.0)
-
-
 def gate_infidelity(channel_ideal, channel_noisy) -> float:
     """
     Gate infidelity: r = 1 - F_avg
@@ -197,49 +152,3 @@ def state_fidelity(rho1: NDArray[np.complex128],
     fidelity = np.trace(sqrt_M).real ** 2
 
     return np.clip(fidelity, 0.0, 1.0)
-
-
-def channel_fidelity_monte_carlo(channel1, channel2,
-                                 n_samples: int = 1000) -> dict:
-    """
-    Monte Carlo оценка различных fidelity метрик
-
-    Сэмплируем случайные чистые состояния и усредняем fidelity
-
-    Args:
-        channel1: Первый канал
-        channel2: Второй канал
-        n_samples: Число случайных состояний
-
-    Returns:
-        Словарь со статистикой
-    """
-    from ..core.states import QuantumState
-    from ..channels.random import random_unitary
-
-    d = 2 ** channel1.n_qubits
-    fidelities = []
-
-    for _ in range(n_samples):
-        # Случайное чистое состояние
-        U = random_unitary(d)
-        psi = U[:, 0]  # Первый столбец
-
-        state = QuantumState(psi, normalize=False)
-        rho = state.to_density_matrix()
-
-        # Применяем каналы
-        rho1 = channel1.apply(rho)
-        rho2 = channel2.apply(rho)
-
-        # Fidelity между выходными состояниями
-        F = state_fidelity(rho1.matrix, rho2.matrix)
-        fidelities.append(F)
-
-    return {
-        "mean_fidelity": np.mean(fidelities),
-        "std_fidelity": np.std(fidelities),
-        "min_fidelity": np.min(fidelities),
-        "max_fidelity": np.max(fidelities),
-        "median_fidelity": np.median(fidelities)
-    }

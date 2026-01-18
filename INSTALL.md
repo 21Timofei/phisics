@@ -315,10 +315,12 @@ for shots in shots_list:
 **Цель**: Исследовать кросс-токи между кубитами
 
 ```python
-from noiselab.channels.two_qubit_noise import CorrelatedNoise
+from noiselab.channels.two_qubit_noise import GeneralCorrelatedNoise
 
-channel = CorrelatedNoise(p_single=0.05, p_correlated=0.1,
-                         correlation_type='XX')
+# Создаем канал с асимметричными ошибками и корреляциями
+channel = GeneralCorrelatedNoise.asymmetric_depolarizing(
+    p1=0.05, p2=0.05, p_corr=0.1
+)
 
 qpt = QuantumProcessTomography(n_qubits=2, shots=1000)
 result = qpt.run_tomography(channel)

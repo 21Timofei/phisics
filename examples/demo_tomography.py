@@ -25,7 +25,7 @@ def demo_single_qubit_depolarizing():
 
     # 1. Создаём неизвестный канал с заданным параметром
     true_parameter = 0.1
-    unknown_channel = DepolarizingChannel(true_parameter, n_qubits=1)
+    unknown_channel = DepolarizingChannel(true_parameter)
 
     print(f"\n✓ Создан неизвестный канал: Depolarizing(p={true_parameter})")
     print(f"  Ранг Крауса: {unknown_channel.kraus_rank()}")
@@ -119,7 +119,7 @@ def demo_statistical_analysis():
     print("ДЕМОНСТРАЦИЯ 3: Статистический анализ (10 прогонов)")
     print("=" * 70)
 
-    unknown_channel = DepolarizingChannel(0.15, n_qubits=1)
+    unknown_channel = DepolarizingChannel(0.15)
     qpt = QuantumProcessTomography(n_qubits=1, shots=1000)
 
     print("\n📊 Запуск 10 независимых томографий...")
@@ -147,40 +147,6 @@ def demo_statistical_analysis():
     return results
 
 
-def demo_two_qubit_tomography():
-    """
-    Демонстрация 2-кубитной томографии
-    """
-    print("\n\n" + "=" * 70)
-    print("ДЕМОНСТРАЦИЯ 4: Двухкубитная томография")
-    print("=" * 70)
-
-    from noiselab.channels.two_qubit_noise import TwoQubitDepolarizing
-
-    # Создаём 2-кубитный канал
-    unknown_channel = TwoQubitDepolarizing(p=0.1)
-
-    print(f"\n✓ Создан 2-кубитный канал")
-    print(f"  Ранг Крауса: {unknown_channel.kraus_rank()}")
-
-    # QPT для 2 кубитов
-    # Внимание: это требует больше времени (4^2 = 16 входных состояний, 3^2 = 9 измерений)
-    qpt = QuantumProcessTomography(n_qubits=2, shots=500)
-
-    print(f"\n📊 Запуск 2-кубитной томографии...")
-    print(f"  Число входных состояний: {len(qpt.input_states)}")
-    print(f"  Число измерительных базисов: {len(qpt.measurement_bases)}")
-    print(f"  Всего измерений: {len(qpt.input_states) * len(qpt.measurement_bases) * 500}")
-
-    result = qpt.run_tomography(unknown_channel, reconstruction_method='LSQ')
-
-    print(f"\n✓ Process Fidelity: {result.process_fidelity:.6f}")
-
-    quality = analyze_tomography_quality(result)
-    print(f"✓ CPTP: {'PASSED' if quality['is_cptp'] else 'FAILED'}")
-    print(f"✓ Реконструированный ранг: {quality['kraus_rank']}")
-
-    return result
 
 
 def main():
@@ -198,16 +164,14 @@ def main():
         result1 = demo_single_qubit_depolarizing()
         result2 = demo_amplitude_damping()
         result3 = demo_statistical_analysis()
-        result4 = demo_two_qubit_tomography()
 
         print("\n\n" + "=" * 70)
         print("✓ ВСЕ ДЕМОНСТРАЦИИ ВЫПОЛНЕНЫ УСПЕШНО!")
         print("=" * 70)
         print("\nДемонстрация показала:")
-        print("  • Томографию различных типов шумовых каналов")
+        print("  • Томографию различных типов шумовых каналов (1 кубит)")
         print("  • Оценку параметров шума с высокой точностью")
         print("  • Статистический анализ множественных прогонов")
-        print("  • Масштабирование на 2-кубитные системы")
 
     except Exception as e:
         print(f"\n❌ Ошибка во время выполнения: {e}")

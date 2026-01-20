@@ -272,8 +272,6 @@ class MaximumLikelihood:
 
         if method == 'choi':
             return self._reconstruct_via_choi(input_states, measurement_data)
-        else:
-            raise NotImplementedError("MLE через операторы Крауса ещё не реализован")
 
     def _reconstruct_via_choi(self,
                              input_states: List[DensityMatrix],

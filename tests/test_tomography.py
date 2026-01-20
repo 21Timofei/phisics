@@ -29,7 +29,7 @@ class TestQPTBasic:
 
     def test_depolarizing_reconstruction(self):
         """Тест: томография деполяризующего канала"""
-        channel = DepolarizingChannel(p=0.1, n_qubits=1)
+        channel = DepolarizingChannel(p=0.1)
 
         qpt = QuantumProcessTomography(n_qubits=1, shots=2000)
         result = qpt.run_tomography(channel, reconstruction_method='LSQ')
@@ -57,7 +57,7 @@ class TestQPTStatistics:
 
     def test_shots_dependency(self):
         """Тест: больше shots → выше fidelity"""
-        channel = DepolarizingChannel(p=0.1, n_qubits=1)
+        channel = DepolarizingChannel(p=0.1)
 
         fidelities = []
         for shots in [100, 500, 2000]:
@@ -71,7 +71,7 @@ class TestQPTStatistics:
 
     def test_multiple_runs_consistency(self):
         """Тест: множественные прогоны дают близкие результаты"""
-        channel = DepolarizingChannel(p=0.15, n_qubits=1)
+        channel = DepolarizingChannel(p=0.15)
         qpt = QuantumProcessTomography(n_qubits=1, shots=1000)
 
         results = qpt.run_multiple_tomographies(channel, n_runs=5,
@@ -84,31 +84,6 @@ class TestQPTStatistics:
         assert std < 0.1, f"Слишком большая дисперсия: {std}"
 
 
-class TestQPTTwoQubit:
-    """Тесты для 2-кубитной томографии"""
-
-    def test_two_qubit_identity(self):
-        """Тест: 2-кубитный identity канал"""
-        identity = KrausChannel.from_unitary(np.eye(4), name="Identity_2q")
-
-        qpt = QuantumProcessTomography(n_qubits=2, shots=500)
-        result = qpt.run_tomography(identity, reconstruction_method='LSQ')
-
-        # Для 2 кубитов fidelity значительно ниже из-за размерности
-        assert result.process_fidelity > 0.30
-
-    def test_two_qubit_depolarizing(self):
-        """Тест: 2-кубитный деполяризующий канал"""
-        from noiselab.channels.two_qubit_noise import TwoQubitDepolarizing
-
-        channel = TwoQubitDepolarizing(p=0.1)
-
-        qpt = QuantumProcessTomography(n_qubits=2, shots=800)
-        result = qpt.run_tomography(channel, reconstruction_method='LSQ')
-
-        assert result.process_fidelity > 0.30  # Допускаем меньшую точность для 2q
-
-
 class TestStatePreparation:
     """Тесты подготовки состояний"""
 
@@ -119,11 +94,6 @@ class TestStatePreparation:
         # Для 1 кубита должно быть 4 или 6 состояний
         assert len(qpt.input_states) >= 4
 
-        qpt2 = QuantumProcessTomography(n_qubits=2, shots=100)
-
-        # Для 2 кубитов: 4^2 = 16 состояний
-        assert len(qpt2.input_states) == 16
-
     def test_measurement_bases(self):
         """Тест: правильное число измерительных базисов"""
         qpt = QuantumProcessTomography(n_qubits=1, shots=100)
@@ -131,18 +101,13 @@ class TestStatePreparation:
         # Для 1 кубита: 3 базиса (X, Y, Z)
         assert len(qpt.measurement_bases) == 3
 
-        qpt2 = QuantumProcessTomography(n_qubits=2, shots=100)
-
-        # Для 2 кубитов: 3^2 = 9 базисов
-        assert len(qpt2.measurement_bases) == 9
-
 
 class TestMetrics:
     """Тесты метрик качества"""
 
     def test_cptp_validation(self):
         """Тест: валидация CPTP после томографии"""
-        channel = DepolarizingChannel(p=0.1, n_qubits=1)
+        channel = DepolarizingChannel(p=0.1)
         qpt = QuantumProcessTomography(n_qubits=1, shots=1500)
 
         result = qpt.run_tomography(channel, reconstruction_method='LSQ')
@@ -155,7 +120,7 @@ class TestMetrics:
     def test_kraus_rank(self):
         """Тест: ранг Крауса реконструированного канала"""
         # Depolarizing имеет ранг 4 для 1 кубита
-        channel = DepolarizingChannel(p=0.1, n_qubits=1)
+        channel = DepolarizingChannel(p=0.1)
         qpt = QuantumProcessTomography(n_qubits=1, shots=1000)
 
         result = qpt.run_tomography(channel, reconstruction_method='LSQ')
@@ -175,7 +140,7 @@ class TestParameterEstimation:
 
         # Используем умеренный шум для точной оценки
         true_p = 0.20
-        channel = DepolarizingChannel(p=true_p, n_qubits=1)
+        channel = DepolarizingChannel(p=true_p)
 
         # Увеличиваем число shots для лучшей статистики
         qpt = QuantumProcessTomography(n_qubits=1, shots=10000)

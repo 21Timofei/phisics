@@ -16,10 +16,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from noiselab.channels.noise_models import (
     DepolarizingChannel,
-    AmplitudeDampingChannel,
-    PhaseDampingChannel
+    AmplitudeDampingChannel
 )
-from noiselab.channels.two_qubit_noise import TwoQubitDepolarizing
 from noiselab.channels.random import random_cptp_channel
 from noiselab.tomography.qpt import QuantumProcessTomography
 from noiselab.metrics.validation import (
@@ -86,49 +84,19 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-def create_channel(channel_type, params, n_qubits):
-    """Создать квантовый канал по типу и параметрам"""
+def create_channel(channel_type, params):
+    """Создать квантовый канал по типу и параметрам (только для 1 кубита)"""
     if channel_type == 'Depolarizing':
         p = params.get('p', 0.1)
-        return DepolarizingChannel(p, n_qubits=n_qubits)
+        return DepolarizingChannel(p)
 
-    elif channel_type == 'Amplitude Damping' and n_qubits == 1:
+    elif channel_type == 'Amplitude Damping':
         gamma = params.get('gamma', 0.3)
         return AmplitudeDampingChannel(gamma)
 
-    elif channel_type == 'Phase Damping' and n_qubits == 1:
-        lambda_ = params.get('lambda', 0.2)
-        return PhaseDampingChannel(lambda_)
-
-    elif channel_type == 'Two-Qubit Depolarizing' and n_qubits == 2:
-        p = params.get('p', 0.1)
-
-        # Проверяем модель корреляций
-        correlation_model = params.get('correlation_model', 'symmetric')
-
-        if correlation_model == 'asymmetric':
-            from noiselab.channels.two_qubit_noise import GeneralCorrelatedNoise
-            p1 = params.get('p1', 0.05)
-            p2 = params.get('p2', 0.05)
-            p_corr = params.get('p_corr', 0.01)
-            return GeneralCorrelatedNoise.asymmetric_depolarizing(p1, p2, p_corr)
-
-        elif correlation_model == 'general':
-            from noiselab.channels.two_qubit_noise import GeneralCorrelatedNoise
-            # Используем случайные параметры для демонстрации
-            import numpy as np
-            error_probs = np.random.dirichlet(np.ones(16)) * p
-            return GeneralCorrelatedNoise(error_probabilities=error_probs.reshape(4, 4))
-
-        else:
-            # Symmetric (по умолчанию)
-            return TwoQubitDepolarizing(p)
-
-    # Для 3 кубитов DepolarizingChannel уже поддерживает n_qubits=3
-
     elif channel_type == 'Random CPTP':
         seed = params.get('seed', None)
-        return random_cptp_channel(n_qubits, seed=seed)
+        return random_cptp_channel(n_qubits=1, seed=seed)
 
     return None
 
@@ -358,52 +326,28 @@ def main():
     with st.sidebar:
         st.header("⚙️ Панель управления")
 
-        # 1. Выбор числа кубитов
-        st.subheader("1️⃣ Число кубитов")
-        n_qubits = st.selectbox("Выберите число кубитов", [1, 2, 3], index=0)
+        # Фиксированное значение: только 1 кубит
+        n_qubits = 1
 
-        if n_qubits == 3:
-            st.warning("⚠️ 3-кубитные системы требуют больше ресурсов и времени вычислений")
+        # 1. Выбор канала
+        st.subheader("1️⃣ Квантовый канал")
 
-        # 2. Выбор канала
-        st.subheader("2️⃣ Квантовый канал")
-
-        if n_qubits == 1:
-            channel_types = ['Depolarizing', 'Amplitude Damping', 'Phase Damping', 'Random CPTP']
-        elif n_qubits == 2:
-            channel_types = ['Depolarizing', 'Two-Qubit Depolarizing', 'Random CPTP']
-        else:  # n_qubits == 3
-            channel_types = ['Depolarizing', 'Random CPTP']
-
+        channel_types = ['Depolarizing', 'Amplitude Damping', 'Random CPTP']
         channel_type = st.selectbox("Тип канала", channel_types)
 
         # Параметры канала
         channel_params = {}
 
         if channel_type == 'Depolarizing':
-            max_p = 0.75 if n_qubits == 1 else (0.5 if n_qubits == 2 else 0.3)
-            p = st.slider("Параметр p (вероятность деполяризации)", 0.0, max_p, 0.1, 0.01)
+            p = st.slider("Параметр p (вероятность деполяризации)", 0.0, 0.75, 0.1, 0.01)
             channel_params['p'] = p
-            num_kraus = 4 ** n_qubits
-            st.info(f"💡 Depolarizing: E(ρ) = (1-p)ρ + p·I/{2**n_qubits}")
-            st.caption(f"Генерируется {num_kraus} операторов Крауса (4^{n_qubits})")
+            st.info(f"💡 Depolarizing: E(ρ) = (1-p)ρ + p·I/2")
+            st.caption(f"Генерируется 4 оператора Крауса")
 
         elif channel_type == 'Amplitude Damping':
             gamma = st.slider("Параметр γ (затухание амплитуды)", 0.0, 1.0, 0.3, 0.01)
             channel_params['gamma'] = gamma
             st.info("💡 Моделирует релаксацию энергии (потерю фотона)")
-
-        elif channel_type == 'Phase Damping':
-            lambda_ = st.slider("Параметр λ (затухание фазы)", 0.0, 0.5, 0.2, 0.01)
-            channel_params['lambda'] = lambda_
-            st.info("💡 Моделирует декогеренцию без потери энергии")
-
-        elif channel_type == 'Two-Qubit Depolarizing':
-            p = st.slider("Параметр p (2-кубитная деполяризация)", 0.0, 0.5, 0.1, 0.01)
-            channel_params['p'] = p
-            channel_params['correlation_model'] = 'symmetric'
-            st.info("💡 Симметричный 2-кубитный деполяризующий канал")
-            st.caption(f"Генерируется 16 операторов Крауса (паули-строки)")
 
         elif channel_type == 'Random CPTP':
             use_seed = st.checkbox("Использовать seed", value=False)
@@ -412,17 +356,11 @@ def main():
                 channel_params['seed'] = seed
             st.info("💡 Случайный CPTP канал (Choi matrix)")
 
-        # 3. Параметры томографии
-        st.subheader("3️⃣ Томография")
-        # Для 3 кубитов нужно больше shots для точности
-        default_shots = 1000 if n_qubits <= 2 else 3000
-        max_shots = 100000 if n_qubits <= 2 else 50000  # Ограничение для 3 кубитов
-        shots = st.number_input("Число измерений (shots)", min_value=100, max_value=max_shots, value=default_shots, step=100)
+        # 2. Параметры томографии
+        st.subheader("2️⃣ Томография")
+        shots = st.number_input("Число измерений (shots)", min_value=100, max_value=100000, value=1000, step=100)
 
-        if n_qubits == 3:
-            st.info(f"💡 Для 3 кубитов рекомендуется минимум 3000 shots для приемлемой точности")
-
-        st.subheader("4️⃣ Шум измерений")
+        st.subheader("3️⃣ Шум измерений")
         add_noise = st.checkbox("Добавить ошибки считывания", value=False)
         readout_error = 0.0
         if add_noise:
@@ -461,7 +399,7 @@ def main():
         with st.spinner('🔬 Выполняется квантовая томография процесса...'):
             try:
                 # Создаём канал
-                true_channel = create_channel(channel_type, channel_params, n_qubits)
+                true_channel = create_channel(channel_type, channel_params)
 
                 if true_channel is None:
                     st.error("❌ Не удалось создать канал")
@@ -579,13 +517,10 @@ def main():
                 st.plotly_chart(fig_ptm, width='stretch')
 
             # Блох-сфера (только для 1 кубита)
-            if n_qubits == 1:
-                st.subheader("3D представление на сфере Блоха")
-                fig_bloch = plot_bloch_sphere_trajectory(result.reconstructed_channel)
-                if fig_bloch:
-                    st.plotly_chart(fig_bloch, width='stretch')
-            elif n_qubits == 3:
-                st.info("ℹ️ Визуализация сферы Блоха доступна только для 1-кубитных систем")
+            st.subheader("3D представление на сфере Блоха")
+            fig_bloch = plot_bloch_sphere_trajectory(result.reconstructed_channel)
+            if fig_bloch:
+                st.plotly_chart(fig_bloch, width='stretch')
 
         with tabs[1]:
             st.markdown("### Аналитика и сравнение")
@@ -656,8 +591,8 @@ def main():
 
                 # Подготовленные состояния
                 st.subheader("Подготовленные состояния")
-                basis_size = 2 ** n_qubits
-                n_states = basis_size ** 2
+                basis_size = 2
+                n_states = 4
                 st.write(f"Всего состояний: {n_states} (полный базис)")
 
                 # Информация о состояниях
@@ -665,8 +600,7 @@ def main():
                 with st.expander("Подробнее о базисе"):
                     st.markdown("""
                     Для томографии используются состояния в вычислительном базисе:
-                    - Для 1 кубита: |0⟩, |1⟩, |+⟩, |-⟩
-                    - Для 2 кубитов: |00⟩, |01⟩, |10⟩, |11⟩ и их суперпозиции
+                    - |0⟩, |1⟩, |+⟩, |-⟩
                     """)
 
                 # Параметры измерений
@@ -792,7 +726,7 @@ def main():
         **NoiseLab++** - это комплексная платформа для исследования квантовых каналов и томографии процессов.
 
         **Возможности:**
-        - Симуляция различных моделей квантового шума (1-3 кубита)
+        - Симуляция различных моделей квантового шума (1 кубит)
         - Квантовая томография процессов (QPT) с методами LSQ и MLE
         - Полная визуализация: матрицы Чой, операторы Крауса, PTM, сфера Блоха
         - Статистический анализ с множественными прогонами

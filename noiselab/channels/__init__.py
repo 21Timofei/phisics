@@ -1,19 +1,12 @@
-"""Модуль квантовых каналов и шумовых моделей"""
+"""Модуль квантовых каналов и шумовых моделей (1 кубит)"""
 from .base import QuantumChannel
 from .kraus import KrausChannel
 from .noise_models import (
     DepolarizingChannel,
     AmplitudeDampingChannel,
-    PhaseDampingChannel,
     BitFlipChannel,
     PhaseFlipChannel,
-    GeneralizedAmplitudeDamping,
-    ThermalRelaxationChannel
-)
-from .two_qubit_noise import (
-    TwoQubitDepolarizing,
-    CrosstalkChannel,
-    GeneralCorrelatedNoise
+    GeneralizedAmplitudeDamping
 )
 from .random import random_cptp_channel
 
@@ -22,13 +15,8 @@ __all__ = [
     'KrausChannel',
     'DepolarizingChannel',
     'AmplitudeDampingChannel',
-    'PhaseDampingChannel',
     'BitFlipChannel',
     'PhaseFlipChannel',
     'GeneralizedAmplitudeDamping',
-    'ThermalRelaxationChannel',
-    'TwoQubitDepolarizing',
-    'CrosstalkChannel',
-    'GeneralCorrelatedNoise',
     'random_cptp_channel'
 ]

@@ -14,9 +14,9 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 class DepolarizingChannel(KrausChannel):
     """
-    Деполяризующий канал (Depolarizing channel)
+    Деполяризующий канал (Depolarizing channel) для 1 кубита
 
-    ε(ρ) = (1-p)ρ + p·I/d
+    ε(ρ) = (1-p)ρ + p·I/2
 
     С вероятностью (1-p) состояние остаётся неизменным,
     с вероятностью p оно заменяется на максимально смешанное состояние
@@ -34,84 +34,35 @@ class DepolarizingChannel(KrausChannel):
     На практике p ∈ [0, 1] - типичный диапазон
     """
 
-    def __init__(self, p: float, n_qubits: int = 1):
+    def __init__(self, p: float):
         """
         Args:
             p: Параметр деполяризации (вероятность полного шума)
-            n_qubits: Число кубитов
         """
         if p < 0:
             raise ValueError(f"Параметр p должен быть неотрицательным: p = {p}")
 
-        max_p = (4 ** n_qubits) / (4 ** n_qubits - 1)
+        max_p = 4 / 3
         if p > max_p:
             raise ValueError(f"Параметр p слишком большой: p = {p} > {max_p}")
 
         self.p = p
 
-        # Для однокубитного случая
-        if n_qubits == 1:
-            dim = 2
+        # Паули матрицы
+        I = np.eye(2, dtype=np.complex128)
+        X = np.array([[0, 1], [1, 0]], dtype=np.complex128)
+        Y = np.array([[0, -1j], [1j, 0]], dtype=np.complex128)
+        Z = np.array([[1, 0], [0, -1]], dtype=np.complex128)
 
-            # Паули матрицы
-            I = np.eye(2, dtype=np.complex128)
-            X = np.array([[0, 1], [1, 0]], dtype=np.complex128)
-            Y = np.array([[0, -1j], [1j, 0]], dtype=np.complex128)
-            Z = np.array([[1, 0], [0, -1]], dtype=np.complex128)
+        # Операторы Крауса
+        kraus_ops = [
+            np.sqrt(1 - 3*p/4) * I,
+            np.sqrt(p/4) * X,
+            np.sqrt(p/4) * Y,
+            np.sqrt(p/4) * Z
+        ]
 
-            # Операторы Крауса
-            kraus_ops = [
-                np.sqrt(1 - 3*p/4) * I,
-                np.sqrt(p/4) * X,
-                np.sqrt(p/4) * Y,
-                np.sqrt(p/4) * Z
-            ]
-
-        else:
-            # Многокубитный случай: ПРАВИЛЬНАЯ модель depolarizing канала
-            # ε(ρ) = (1-p)ρ + p·I/2^n
-            #
-            # Операторы Крауса:
-            # K_0 = √(1 - p(4^n-1)/4^n) · I
-            # K_i = √(p/4^n) · P_i  для всех паули-строк P_i (i=1...4^n-1)
-
-            from itertools import product
-
-            dim = 2 ** n_qubits
-            num_paulis = 4 ** n_qubits
-
-            # Правильные коэффициенты для depolarizing канала
-            c0 = np.sqrt(1 - p * (num_paulis - 1) / num_paulis)
-            c_pauli = np.sqrt(p / num_paulis)
-
-            # Базисные матрицы Паули для 1 кубита
-            paulis_1q = [
-                np.eye(2, dtype=np.complex128),  # I
-                np.array([[0, 1], [1, 0]], dtype=np.complex128),  # X
-                np.array([[0, -1j], [1j, 0]], dtype=np.complex128),  # Y
-                np.array([[1, 0], [0, -1]], dtype=np.complex128),  # Z
-            ]
-
-            # Генерируем все паули-строки через тензорное произведение
-            kraus_ops = []
-
-            for idx, combo in enumerate(product(range(4), repeat=n_qubits)):
-                # Строим паули-строку для этой комбинации
-                pauli_string = paulis_1q[combo[0]]
-                for qubit_idx in combo[1:]:
-                    pauli_string = np.kron(pauli_string, paulis_1q[qubit_idx])
-
-                # Первый оператор (Identity) с коэффициентом c0
-                if idx == 0:
-                    kraus_ops.append(c0 * pauli_string)
-                else:
-                    # Остальные операторы с коэффициентом c_pauli
-                    kraus_ops.append(c_pauli * pauli_string)
-
-            # Проверка: должно быть 4^n операторов
-            assert len(kraus_ops) == num_paulis, f"Expected {num_paulis} Kraus operators, got {len(kraus_ops)}"
-
-        super().__init__(kraus_ops, n_qubits=n_qubits,
+        super().__init__(kraus_ops, n_qubits=1,
                         name=f"Depolarizing(p={p:.4f})", validate=True)
 
 
@@ -163,55 +114,9 @@ class AmplitudeDampingChannel(KrausChannel):
         kraus_ops = [K0, K1]
 
         super().__init__(kraus_ops, n_qubits=1,
-                        name=f"AmplitudeDamping(γ={gamma:.4f})", validate=True)
+                        name=f"AmplitudeDamping(gamma={gamma:.4f})", validate=True)
 
 
-class PhaseDampingChannel(KrausChannel):
-    """
-    Фазовое затухание (Phase Damping / Dephasing)
-
-    Разрушает когерентность без изменения популяций
-    Недиагональные элементы матрицы плотности затухают
-
-    Физическая интерпретация:
-    - Случайные флуктуации фазы
-    - T₂ процесс (чистый dephasing, T₂* процесс)
-    - Взаимодействие с медленным флуктуирующим окружением
-
-    Операторы Крауса:
-    K₀ = √(1-λ) I
-    K₁ = √λ Z
-
-    Действие:
-    ε(ρ) = (1-λ)ρ + λ Z ρ Z
-
-    Диагональные элементы не меняются: ⟨0|ε(ρ)|0⟩ = ⟨0|ρ|0⟩
-    Недиагональные затухают: ⟨0|ε(ρ)|1⟩ = (1-2λ)⟨0|ρ|1⟩
-
-    Параметр λ ∈ [0, 1/2] для сохранения положительности
-    """
-
-    def __init__(self, lambda_: float):
-        """
-        Args:
-            lambda_: Параметр дефазировки
-        """
-        if not 0 <= lambda_ <= 0.5:
-            raise ValueError(f"Параметр λ должен быть в [0, 0.5]: λ = {lambda_}")
-
-        self.lambda_ = lambda_
-
-        I = np.eye(2, dtype=np.complex128)
-        Z = np.array([[1, 0], [0, -1]], dtype=np.complex128)
-
-        # Операторы Крауса
-        K0 = np.sqrt(1 - lambda_) * I
-        K1 = np.sqrt(lambda_) * Z
-
-        kraus_ops = [K0, K1]
-
-        super().__init__(kraus_ops, n_qubits=1,
-                        name=f"PhaseDamping(λ={lambda_:.4f})", validate=True)
 
 
 class BitFlipChannel(KrausChannel):
@@ -351,71 +256,6 @@ class GeneralizedAmplitudeDamping(KrausChannel):
         kraus_ops = [K0, K1, K2, K3]
 
         super().__init__(kraus_ops, n_qubits=1,
-                        name=f"GAD(γ={gamma:.3f},p_th={p_th:.3f})", validate=True)
+                        name=f"GAD(gamma={gamma:.3f},p_th={p_th:.3f})", validate=True)
 
 
-class ThermalRelaxationChannel(KrausChannel):
-    """
-    Канал тепловой релаксации
-
-    Моделирует реалистичную релаксацию с временами T₁ и T₂
-
-    Параметры:
-    - T₁: время энергетической релаксации (amplitude damping)
-    - T₂: время дефазировки (phase damping)
-    - t: время эволюции
-    - p_th: тепловая популяция
-
-    Физическое ограничение: T₂ ≤ 2T₁
-
-    Реализуется как композиция GAD и phase damping
-    """
-
-    def __init__(self, T1: float, T2: float, t: float, p_th: float = 0.0):
-        """
-        Args:
-            T1: Время T₁ релаксации
-            T2: Время T₂ дефазировки
-            t: Время эволюции
-            p_th: Тепловая популяция
-        """
-        if T1 <= 0 or T2 <= 0:
-            raise ValueError("T1 и T2 должны быть положительными")
-
-        if T2 > 2 * T1:
-            raise ValueError(f"Физически невозможно: T₂ > 2T₁ ({T2} > {2*T1})")
-
-        if t < 0:
-            raise ValueError("Время должно быть неотрицательным")
-
-        # Параметры каналов
-        gamma = 1 - np.exp(-t / T1) if T1 != np.inf else 0
-
-        # Чистая дефазировка (T₂* процесс)
-        # 1/T₂ = 1/(2T₁) + 1/T₂*
-        # λ соответствует чистой дефазировке без учёта вклада от T₁
-        rate_phi = 1/T2 - 1/(2*T1) if T1 != np.inf else 1/T2
-        lambda_ = (1 - np.exp(-t * rate_phi)) / 2 if rate_phi > 0 else 0
-        lambda_ = max(0, min(0.5, lambda_))  # Обрезка для численной стабильности
-
-        # Создаём композицию GAD и phase damping
-        # Сначала применяем GAD
-        gad = GeneralizedAmplitudeDamping(gamma, p_th)
-
-        # Затем phase damping
-        if lambda_ > 1e-10:
-            pd = PhaseDampingChannel(lambda_)
-            # Композиция каналов
-            composed = gad.compose(pd)
-            kraus_ops = composed.get_kraus_operators()
-        else:
-            kraus_ops = gad.get_kraus_operators()
-
-        super().__init__(kraus_ops, n_qubits=1,
-                        name=f"ThermalRelax(T1={T1:.2f},T2={T2:.2f},t={t:.2f})",
-                        validate=False)
-
-        self.T1 = T1
-        self.T2 = T2
-        self.t = t
-        self.p_th = p_th

@@ -129,8 +129,7 @@ def estimate_error_rates(reconstructed_channel,
     from ..metrics.fidelity import process_fidelity
     from ..channels.noise_models import (
         DepolarizingChannel,
-        AmplitudeDampingChannel,
-        PhaseDampingChannel
+        AmplitudeDampingChannel
     )
 
     n_qubits = reconstructed_channel.n_qubits
@@ -161,7 +160,7 @@ def estimate_error_rates(reconstructed_channel,
 
                 for p in np.linspace(0, 0.5, 100):
                     try:
-                        noise = DepolarizingChannel(p, n_qubits=n_qubits)
+                        noise = DepolarizingChannel(p)
                         noisy_channel = ideal_channel.compose(noise)
 
                         # Вычисляем среднее расстояние между выходами
@@ -193,7 +192,7 @@ def estimate_error_rates(reconstructed_channel,
 
                     for p in np.linspace(p_min, p_max, 50):
                         try:
-                            noise = DepolarizingChannel(p, n_qubits=n_qubits)
+                            noise = DepolarizingChannel(p)
                             noisy_channel = ideal_channel.compose(noise)
 
                             total_distance = 0.0
@@ -221,7 +220,7 @@ def estimate_error_rates(reconstructed_channel,
 
                 for p in np.linspace(0, 0.5, 100):
                     try:
-                        noise = DepolarizingChannel(p, n_qubits=n_qubits)
+                        noise = DepolarizingChannel(p)
                         noisy_channel = ideal_channel.compose(noise)
                         F = process_fidelity(reconstructed_channel, noisy_channel)
 
@@ -238,7 +237,7 @@ def estimate_error_rates(reconstructed_channel,
 
             for p in np.linspace(0, 0.5, 100):
                 try:
-                    noise = DepolarizingChannel(p, n_qubits=n_qubits)
+                    noise = DepolarizingChannel(p)
                     noisy_channel = ideal_channel.compose(noise)
                     F = process_fidelity(reconstructed_channel, noisy_channel)
 
@@ -250,7 +249,7 @@ def estimate_error_rates(reconstructed_channel,
 
         # Проверяем точность через подгонку
         try:
-            noise = DepolarizingChannel(estimated_p, n_qubits=n_qubits)
+            noise = DepolarizingChannel(estimated_p)
             noisy_channel = ideal_channel.compose(noise)
             fit_fidelity = process_fidelity(reconstructed_channel, noisy_channel)
         except:
@@ -283,30 +282,6 @@ def estimate_error_rates(reconstructed_channel,
         return {
             "model": "amplitude_damping",
             "parameter": best_gamma,
-            "fit_fidelity": best_fidelity
-        }
-
-    elif error_model == 'phase_damping' and n_qubits == 1:
-        # Сканируем параметр λ
-        best_lambda = 0.0
-        best_fidelity = 0.0
-
-        for lambda_ in np.linspace(0, 0.5, 50):
-            try:
-                noise = PhaseDampingChannel(lambda_)
-                noisy_channel = ideal_channel.compose(noise)
-
-                F = process_fidelity(reconstructed_channel, noisy_channel)
-
-                if F > best_fidelity:
-                    best_fidelity = F
-                    best_lambda = lambda_
-            except:
-                continue
-
-        return {
-            "model": "phase_damping",
-            "parameter": best_lambda,
             "fit_fidelity": best_fidelity
         }
 

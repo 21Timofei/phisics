@@ -35,7 +35,6 @@ def demo_single_qubit_depolarizing():
 
     qpt = QuantumProcessTomography(n_qubits=1, shots=1000)
 
-    # Добавь это:
     print("\n" + "="*70)
     print("ВХОДНЫЕ СОСТОЯНИЯ:")
     print("="*70)

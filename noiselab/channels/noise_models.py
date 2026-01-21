@@ -117,6 +117,52 @@ class AmplitudeDampingChannel(KrausChannel):
                         name=f"AmplitudeDamping(gamma={gamma:.4f})", validate=True)
 
 
+class PhaseDampingChannel(KrausChannel):
+    """
+    Фазовое затухание (Phase Damping / Dephasing)
+
+    Разрушает когерентность без изменения популяций
+    Недиагональные элементы матрицы плотности затухают
+
+    Физическая интерпретация:
+    - Случайные флуктуации фазы
+    - T₂ процесс (чистый dephasing, T₂* процесс)
+    - Взаимодействие с медленным флуктуирующим окружением
+
+    Операторы Крауса:
+    K₀ = √(1-λ) I
+    K₁ = √λ Z
+
+    Действие:
+    ε(ρ) = (1-λ)ρ + λ Z ρ Z
+
+    Диагональные элементы не меняются: ⟨0|ε(ρ)|0⟩ = ⟨0|ρ|0⟩
+    Недиагональные затухают: ⟨0|ε(ρ)|1⟩ = (1-2λ)⟨0|ρ|1⟩
+
+    Параметр λ ∈ [0, 1/2] для сохранения положительности
+    """
+
+    def __init__(self, lambda_: float):
+        """
+        Args:
+            lambda_: Параметр дефазировки
+        """
+        if not 0 <= lambda_ <= 0.5:
+            raise ValueError(f"Параметр lambda должен быть в [0, 0.5]: lambda = {lambda_}")
+
+        self.lambda_ = lambda_
+
+        I = np.eye(2, dtype=np.complex128)
+        Z = np.array([[1, 0], [0, -1]], dtype=np.complex128)
+
+        # Операторы Крауса
+        K0 = np.sqrt(1 - lambda_) * I
+        K1 = np.sqrt(lambda_) * Z
+
+        kraus_ops = [K0, K1]
+
+        super().__init__(kraus_ops, n_qubits=1,
+                        name=f"PhaseDamping(lambda={lambda_:.4f})", validate=True)
 
 
 class BitFlipChannel(KrausChannel):

@@ -4,6 +4,7 @@ from .kraus import KrausChannel
 from .noise_models import (
     DepolarizingChannel,
     AmplitudeDampingChannel,
+    PhaseDampingChannel,
     BitFlipChannel,
     PhaseFlipChannel,
     GeneralizedAmplitudeDamping
@@ -15,6 +16,7 @@ __all__ = [
     'KrausChannel',
     'DepolarizingChannel',
     'AmplitudeDampingChannel',
+    'PhaseDampingChannel',
     'BitFlipChannel',
     'PhaseFlipChannel',
     'GeneralizedAmplitudeDamping',

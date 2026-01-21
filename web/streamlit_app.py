@@ -16,9 +16,9 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from noiselab.channels.noise_models import (
     DepolarizingChannel,
-    AmplitudeDampingChannel
+    AmplitudeDampingChannel,
+    PhaseDampingChannel
 )
-from noiselab.channels.random import random_cptp_channel
 from noiselab.tomography.qpt import QuantumProcessTomography
 from noiselab.metrics.validation import (
     analyze_tomography_quality,
@@ -94,9 +94,9 @@ def create_channel(channel_type, params):
         gamma = params.get('gamma', 0.3)
         return AmplitudeDampingChannel(gamma)
 
-    elif channel_type == 'Random CPTP':
-        seed = params.get('seed', None)
-        return random_cptp_channel(n_qubits=1, seed=seed)
+    elif channel_type == 'Phase Damping':
+        lambda_ = params.get('lambda', 0.2)
+        return PhaseDampingChannel(lambda_)
 
     return None
 
@@ -332,7 +332,7 @@ def main():
         # 1. Выбор канала
         st.subheader("1️⃣ Квантовый канал")
 
-        channel_types = ['Depolarizing', 'Amplitude Damping', 'Random CPTP']
+        channel_types = ['Depolarizing', 'Amplitude Damping', 'Phase Damping']
         channel_type = st.selectbox("Тип канала", channel_types)
 
         # Параметры канала
@@ -349,12 +349,10 @@ def main():
             channel_params['gamma'] = gamma
             st.info("💡 Моделирует релаксацию энергии (потерю фотона)")
 
-        elif channel_type == 'Random CPTP':
-            use_seed = st.checkbox("Использовать seed", value=False)
-            if use_seed:
-                seed = st.number_input("Seed", value=42, step=1)
-                channel_params['seed'] = seed
-            st.info("💡 Случайный CPTP канал (Choi matrix)")
+        elif channel_type == 'Phase Damping':
+            lambda_ = st.slider("Параметр λ (дефазировка)", 0.0, 0.5, 0.2, 0.01)
+            channel_params['lambda'] = lambda_
+            st.info("💡 Разрушает когерентность без изменения популяций")
 
         # 2. Параметры томографии
         st.subheader("2️⃣ Томография")
@@ -368,11 +366,6 @@ def main():
 
         st.subheader("5️⃣ Алгоритм")
         method = st.selectbox("Метод реконструкции", ['LSQ', 'MLE'])
-
-        if method == 'LSQ':
-            st.info("💡 Линейная инверсия (Least Squares) - быстрый метод")
-        elif method == 'MLE':
-            st.info("💡 Максимальное правдоподобие - гарантирует CPTP")
 
 
         st.markdown("---")
@@ -470,9 +463,6 @@ def main():
                 delta=f"{(result.process_fidelity - 0.95):.4f}" if result.process_fidelity > 0.95 else None
             )
 
-        with col2:
-            cptp_status = "✅ Да" if quality['is_cptp'] else "❌ Нет"
-            st.metric(label="CPTP", value=cptp_status)
 
         with col3:
             st.metric(label="TP ошибка", value=f"{quality['tp_error']:.2e}")
@@ -572,15 +562,13 @@ def main():
                     'Process Fidelity',
                     'Число операторов Крауса',
                     'Ранг Крауса',
-                    'TP ошибка',
-                    'CPTP валидность'
+                    'TP ошибка'
                 ],
                 'Значение': [
                     f"{result.process_fidelity:.6f}",
                     str(quality['n_kraus_operators']),
                     str(quality['kraus_rank']),
-                    f"{quality['tp_error']:.2e}",
-                    "Да" if quality['is_cptp'] else "Нет"
+                    f"{quality['tp_error']:.2e}"
                 ]
             })
             st.dataframe(info_df, width='stretch')

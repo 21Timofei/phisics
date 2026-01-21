@@ -59,11 +59,9 @@ class QuantumProcessTomography:
     def __init__(self, n_qubits: int, shots: int = 1000):
         """
         Args:
-            n_qubits: Число кубитов (1-3)
+            n_qubits: Число кубитов (1)
             shots: Число измерений для каждой настройки
         """
-        if n_qubits < 1 or n_qubits > 3:
-            raise ValueError("Поддерживается 1-3 кубита")
 
         self.n_qubits = n_qubits
         self.dim = 2 ** n_qubits

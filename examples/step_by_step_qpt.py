@@ -262,15 +262,13 @@ def step_by_step_demo():
     print(f"  Отрицательных: {np.sum(eigenvalues_raw < -1e-10)}")
 
     choi_reconstructed = choi_raw
-    eigenvalues_final = eigenvalues_raw
-
 
     print_section("ШАГ 6: Извлечение операторов Крауса", 1)
 
     print("\nИз Choi matrix извлекаем операторы Крауса")
     print("χ = Σᵢ λᵢ |vᵢ⟩⟨vᵢ|  →  Kᵢ = √λᵢ · reshape(|vᵢ⟩, (2,2))")
 
-    from noiselab.representations.kraus_decomp import kraus_decomposition, analyze_kraus_structure
+    from noiselab.representations.kraus_decomp import kraus_decomposition
 
     kraus_operators = kraus_decomposition(choi_reconstructed)
 
@@ -295,12 +293,6 @@ def step_by_step_demo():
     print(f"\n1. Process Fidelity:")
     print(f"   F = Tr(χ_true · χ_reconstructed) = {fidelity:.8f}")
     print(f"   Интерпретация: {fidelity*100:.4f}% перекрытие")
-
-
-    # Frobenius distance
-    frobenius_dist = np.linalg.norm(choi_true - choi_reconstructed, ord='fro')
-    print(f"\n2. Frobenius distance:")
-    print(f"   ||χ_true - χ_reconstructed||_F = {frobenius_dist:.8f}")
 
 if __name__ == "__main__":
     step_by_step_demo()

@@ -21,7 +21,7 @@ from core.states import DensityMatrix
 from core.measurements import PauliMeasurement
 from channels.base import QuantumChannel
 from channels.kraus import KrausChannel
-from .reconstruction import LinearInversion, MaximumLikelihood
+from .reconstruction import LinearInversion
 
 
 @dataclass
@@ -51,7 +51,7 @@ class QuantumProcessTomography:
     1. Подготовка набора входных состояний (tomographically complete set)
     2. Применение неизвестного канала к каждому состоянию
     3. Измерения выходных состояний во всех паули-базисах
-    4. Реконструкция канала (LSQ или MLE)
+    4. Реконструкция канала (LSQ)
     5. Валидация и анализ
     """
 
@@ -132,7 +132,7 @@ class QuantumProcessTomography:
 
         Args:
             unknown_channel: Неизвестный канал для диагностики
-            reconstruction_method: 'LSQ' или 'MLE'
+            reconstruction_method: 'LSQ' (Linear Inversion)
             add_measurement_noise: Добавлять ли шум измерений
             readout_error: Вероятность ошибки считывания
 
@@ -171,13 +171,13 @@ class QuantumProcessTomography:
 
         print(f"[OK] Проведено {len(measurement_data) * len(self.measurement_bases)} измерений")
 
-        # Шаг 3: Реконструкция канала
-        if reconstruction_method == 'LSQ':
-            # Реконструируем состояния из измерений (state tomography)
-            reconstructed_output_states = self._reconstruct_states_from_measurements(measurement_data)
-            reconstructed = self._reconstruct_lsq(reconstructed_output_states)
-        else:
-            raise ValueError(f"Неизвестный метод: {reconstruction_method}")
+        # Шаг 3: Реконструкция канала (Linear Inversion)
+        if reconstruction_method != 'LSQ':
+            raise ValueError(f"Поддерживается только метод 'LSQ'. Получено: {reconstruction_method}")
+        
+        # Реконструируем состояния из измерений (state tomography)
+        reconstructed_output_states = self._reconstruct_states_from_measurements(measurement_data)
+        reconstructed = self._reconstruct_lsq(reconstructed_output_states)
 
         print(f"[OK] Канал реконструирован (ранг Крауса: {reconstructed.kraus_rank()})")
 
@@ -372,26 +372,6 @@ class QuantumProcessTomography:
             name="LSQ_reconstructed",
             validate=False
         )
-
-    def _reconstruct_mle(self, measurement_data: List[Dict[str, Dict[str, int]]]) -> KrausChannel:
-        """
-        Реконструкция методом максимального правдоподобия
-        """
-        mle = MaximumLikelihood()
-
-        # Преобразуем данные в нужный формат
-        # Для упрощения используем измерения в Z-базисе
-        simplified_data = []
-
-        for state_measurements in measurement_data:
-            if 'Z' in state_measurements:
-                simplified_data.append(state_measurements['Z'])
-            else:
-                # Используем первый доступный базис
-                first_basis = list(state_measurements.keys())[0]
-                simplified_data.append(state_measurements[first_basis])
-
-        return mle.reconstruct(self.input_states, simplified_data, method='choi')
 
     def run_multiple_tomographies(self,
                                  unknown_channel: QuantumChannel,

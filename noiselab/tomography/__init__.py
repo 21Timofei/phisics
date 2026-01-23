@@ -1,6 +1,6 @@
 """Модуль квантовой процессной томографии"""
 from .qpt import QuantumProcessTomography, QPTResult
-from .reconstruction import LinearInversion, MaximumLikelihood
+from .reconstruction import LinearInversion
 
 __all__ = [
     'QuantumProcessTomography',

@@ -145,10 +145,15 @@ def step_by_step_demo():
 
     print_section("ШАГ 4: Реконструкция выходных состояний из измерений", 1)
 
-    print("\nИспользуем формулу:")
-    print("  ρ = (I + ⟨X⟩·X + ⟨Y⟩·Y + ⟨Z⟩·Z) / 2")
+    print("\nИспользуем state tomography для реконструкции выходных состояний")
+    print("Формула: ρ = (I + ⟨X⟩·X + ⟨Y⟩·Y + ⟨Z⟩·Z) / 2")
+    print("\nИспользуем готовые методы из QuantumProcessTomography")
 
-    reconstructed_states = []
+    from noiselab.tomography.qpt import QuantumProcessTomography
+
+    # Создаём временный QPT объект для использования его методов
+    qpt_helper = QuantumProcessTomography(shots=shots)
+    qpt_helper.input_states = input_states  # Используем наши входные состояния
 
     # Показываем детально первое состояние
     print(f"\n{'═' * 80}")
@@ -157,19 +162,15 @@ def step_by_step_demo():
 
     measurements = measurement_data[0]
 
-    # Вычисляем expectation values
-    exp_values = {}
-    for basis in ['X', 'Y', 'Z']:
-        counts = measurements[basis]
-        total = sum(counts.values())
-        n_plus = counts.get('0', 0) + counts.get('+', 0) + counts.get('+i', 0)
-        n_minus = counts.get('1', 0) + counts.get('-', 0) + counts.get('-i', 0)
-        exp_values[basis] = (n_plus - n_minus) / total
+    # Вычисляем expectation values (используем метод из QPT)
+    exp_x = qpt_helper._expectation_from_counts(measurements.get('X', {}))
+    exp_y = qpt_helper._expectation_from_counts(measurements.get('Y', {}))
+    exp_z = qpt_helper._expectation_from_counts(measurements.get('Z', {}))
 
     print(f"\nШаг 4.1: Вычислены expectation values:")
-    print(f"  ⟨X⟩ = {exp_values['X']:+.6f}")
-    print(f"  ⟨Y⟩ = {exp_values['Y']:+.6f}")
-    print(f"  ⟨Z⟩ = {exp_values['Z']:+.6f}")
+    print(f"  ⟨X⟩ = {exp_x:+.6f}")
+    print(f"  ⟨Y⟩ = {exp_y:+.6f}")
+    print(f"  ⟨Z⟩ = {exp_z:+.6f}")
 
     # Паули матрицы
     X = np.array([[0, 1], [1, 0]], dtype=np.complex128)
@@ -178,21 +179,21 @@ def step_by_step_demo():
     I = np.eye(2, dtype=np.complex128)
 
     print(f"\nШаг 4.2: Строим матрицу плотности:")
-    print(f"  ρ = (I + {exp_values['X']:+.3f}·X + {exp_values['Y']:+.3f}·Y + {exp_values['Z']:+.3f}·Z) / 2")
+    print(f"  ρ = (I + {exp_x:+.3f}·X + {exp_y:+.3f}·Y + {exp_z:+.3f}·Z) / 2")
 
-    rho_raw = (I + exp_values['X']*X + exp_values['Y']*Y + exp_values['Z']*Z) / 2
+    rho_raw = (I + exp_x*X + exp_y*Y + exp_z*Z) / 2
     print_matrix(rho_raw, "  ρ (сырая)")
 
     # Проверяем физичность
     eigenvalues = np.linalg.eigvalsh(rho_raw)
 
     if np.any(eigenvalues < -1e-10):
-        print(f"  ⚠ Есть отрицательные! Обрезаем их до 0")
+        print(f"  ⚠ Есть отрицательные собственные значения! Проецируем на положительность")
         eigenvalues = np.maximum(eigenvalues, 0)
         eigenvectors = np.linalg.eigh(rho_raw)[1]
         rho_physical = eigenvectors @ np.diag(eigenvalues) @ eigenvectors.conj().T
     else:
-        print(f"  ✓ Все положительные")
+        print(f"  ✓ Все собственные значения положительные")
         rho_physical = rho_raw
 
     # Нормализация
@@ -210,32 +211,15 @@ def step_by_step_demo():
 
     # Сравнение с истинным
     rho_true = output_states[0].matrix
-    fidelity = np.trace(rho_true @ rho_physical).real
+    fidelity_state = np.trace(rho_true @ rho_physical).real
     print(f"\nСравнение с истинным состоянием:")
-    print(f"  Fidelity: {fidelity:.6f}")
-
-    reconstructed_states.append(DensityMatrix(rho_physical))
+    print(f"  Fidelity: {fidelity_state:.6f}")
 
     print(f"\n{'─' * 80}")
-    print("Реконструируем остальные 3 состояния...")
+    print("Реконструируем остальные 3 состояния (используем метод QPT)...")
 
-    for measurements in measurement_data[1:]:
-        exp_values = {}
-        for basis in ['X', 'Y', 'Z']:
-            counts = measurements[basis]
-            total = sum(counts.values())
-            n_plus = counts.get('0', 0) + counts.get('+', 0) + counts.get('+i', 0)
-            n_minus = counts.get('1', 0) + counts.get('-', 0) + counts.get('-i', 0)
-            exp_values[basis] = (n_plus - n_minus) / total
-
-        rho = (I + exp_values['X']*X + exp_values['Y']*Y + exp_values['Z']*Z) / 2
-        eigenvalues = np.linalg.eigvalsh(rho)
-        eigenvalues = np.maximum(eigenvalues, 0)
-        trace = np.trace(rho).real
-        if trace > 1e-10:
-            rho = rho / trace
-
-        reconstructed_states.append(DensityMatrix(rho))
+    # Используем готовый метод для всех состояний
+    reconstructed_states = qpt_helper._reconstruct_states_from_measurements(measurement_data)
 
     print(f"Реконструировано {len(reconstructed_states)} состояний")
 
@@ -254,7 +238,6 @@ def step_by_step_demo():
 
     # Анализ
     eigenvalues_raw = np.linalg.eigvalsh(choi_raw)
-    trace_raw = np.trace(choi_raw).real
 
     print(f"\nШаг 5.2: Анализ сырой матрицы:")
     print(f"  Собственные значения: {[f'{ev:.6f}' for ev in eigenvalues_raw]}")
@@ -262,23 +245,18 @@ def step_by_step_demo():
     print(f"  Отрицательных: {np.sum(eigenvalues_raw < -1e-10)}")
 
     choi_reconstructed = choi_raw
-    eigenvalues_final = eigenvalues_raw
-
 
     print_section("ШАГ 6: Извлечение операторов Крауса", 1)
 
     print("\nИз Choi matrix извлекаем операторы Крауса")
     print("χ = Σᵢ λᵢ |vᵢ⟩⟨vᵢ|  →  Kᵢ = √λᵢ · reshape(|vᵢ⟩, (2,2))")
 
-    from noiselab.representations.kraus_decomp import kraus_decomposition, analyze_kraus_structure
+    from noiselab.representations.kraus_decomp import kraus_decomposition
 
     kraus_operators = kraus_decomposition(choi_reconstructed)
 
     print(f"\nПолучено операторов Крауса: {len(kraus_operators)}")
     print(f"Ранг Крауса: {len(kraus_operators)}")
-
-    # Анализируем структуру операторов
-    analysis = analyze_kraus_structure(kraus_operators)
 
     print(f"\nОператоры Крауса:")
     print("-" * 60)
@@ -286,8 +264,6 @@ def step_by_step_demo():
     for i, k in enumerate(kraus_operators):
         print(f"\nK_{i}:")
         print_matrix(k, f"  K_{i}")
-
-
 
 
     print_section("ШАГ 7: Анализ качества реконструкции", 1)
@@ -300,51 +276,6 @@ def step_by_step_demo():
     print(f"\n1. Process Fidelity:")
     print(f"   F = Tr(χ_true · χ_reconstructed) = {fidelity:.8f}")
     print(f"   Интерпретация: {fidelity*100:.4f}% перекрытие")
-
-    if fidelity > 0.99:
-        print(f"   ✓ Отличная реконструкция!")
-    elif fidelity > 0.95:
-        print(f"   ✓ Хорошая реконструкция")
-    else:
-        print(f"   ⚠ Требуется улучшение")
-
-    # Frobenius distance
-    frobenius_dist = np.linalg.norm(choi_true - choi_reconstructed, ord='fro')
-    print(f"\n2. Frobenius distance:")
-    print(f"   ||χ_true - χ_reconstructed||_F = {frobenius_dist:.8f}")
-
-    if len(kraus_operators) > 0:
-        K0_coeff = np.abs(kraus_operators[0][0, 0])
-        estimated_p = 4 * (1 - K0_coeff**2) / 3
-
-
-    print_section("ФИНАЛЬНЫЙ ОТЧЕТ", 1)
-
-    print("\n" + "=" * 80)
-    print("  СВОДКА РЕЗУЛЬТАТОВ")
-    print("=" * 80)
-
-    print(f"\n1. ИССЛЕДУЕМЫЙ КАНАЛ:")
-    print(f"   Тип: Деполяризующий")
-    print(f"   Параметр: p = {p}")
-
-    print(f"\n2. ТОМОГРАФИЯ:")
-    print(f"   Входных состояний: {len(input_states)}")
-    print(f"   Shots на измерение: {shots}")
-    print(f"   Всего измерений: {len(input_states) * 3 * shots}")
-
-    print(f"\n3. РЕКОНСТРУКЦИЯ:")
-    print(f"   Метод: Linear Inversion (LSQ)")
-    print(f"   Ранг Крауса: {len(kraus_operators)}")
-
-    print(f"\n4. КАЧЕСТВО:")
-    print(f"   Process Fidelity: {fidelity:.8f}")
-    print(f"   Frobenius distance: {frobenius_dist:.8f}")
-
-    print("\n" + "=" * 80)
-    print("  ДЕМОНСТРАЦИЯ ЗАВЕРШЕНА")
-    print("=" * 80 + "\n")
-
 
 if __name__ == "__main__":
     step_by_step_demo()

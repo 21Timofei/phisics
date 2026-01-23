@@ -15,7 +15,6 @@ from noiselab.metrics.fidelity import process_fidelity_choi
 
 
 def print_section(title: str, level: int = 1):
-    """Красивый заголовок"""
     if level == 1:
         print("\n" + "=" * 80)
         print(f"  {title}")
@@ -104,16 +103,6 @@ def step_by_step_demo():
 
         print_matrix(rho_in.matrix, "  ВХОД (ρ_in)")
         print_matrix(rho_out.matrix, "  ВЫХОД (ρ_out)")
-
-        # Анализ
-        fidelity = np.trace(rho_in.matrix @ rho_out.matrix).real
-        purity_in = np.trace(rho_in.matrix @ rho_in.matrix).real
-        purity_out = np.trace(rho_out.matrix @ rho_out.matrix).real
-
-        print(f"\n  Анализ:")
-        print(f"    Fidelity: {fidelity:.6f}")
-        print(f"    Чистота: {purity_in:.6f} → {purity_out:.6f}")
-        print(f"    Потеря чистоты: {purity_in - purity_out:.6f}")
 
 
     print_section("ШАГ 3: Измерения выходных состояний", 1)
@@ -293,8 +282,10 @@ def step_by_step_demo():
     print(f"  Отрицательных: {np.sum(eigenvalues_raw < -1e-10)}")
     print(f"  Trace: {trace_raw:.6f} (должно быть 2.0)")
 
-    choi_cptp = choi_raw
-    eigenvalues_cptp = eigenvalues_raw
+    # Используем сырую матрицу без CPTP проекции
+    choi_reconstructed = choi_raw
+    eigenvalues_final = eigenvalues_raw
+
 
     print_section("ШАГ 6: Извлечение операторов Крауса", 1)
 
@@ -302,18 +293,18 @@ def step_by_step_demo():
     print("χ = Σᵢ λᵢ |vᵢ⟩⟨vᵢ|  →  Kᵢ = √λᵢ · reshape(|vᵢ⟩, (2,2))")
 
     threshold = 1e-10
-    positive_indices = eigenvalues_cptp > threshold
-    eigenvalues_positive = eigenvalues_cptp[positive_indices]
+    positive_indices = eigenvalues_final > threshold
+    eigenvalues_positive = eigenvalues_final[positive_indices]
 
-    print(f"\nШаг 7.1: Отбираем значимые собственные значения:")
+    print(f"\nШаг 6.1: Отбираем значимые собственные значения:")
     print(f"  Порог: {threshold:.2e}")
-    print(f"  Значимых: {len(eigenvalues_positive)} из {len(eigenvalues_cptp)}")
+    print(f"  Значимых: {len(eigenvalues_positive)} из {len(eigenvalues_final)}")
     print(f"  Ранг Крауса: {len(eigenvalues_positive)}")
 
-    eigenvectors = np.linalg.eigh(choi_cptp)[1]
+    eigenvectors = np.linalg.eigh(choi_reconstructed)[1]
     kraus_operators = []
 
-    print(f"\nШаг 7.2: Строим операторы Крауса:")
+    print(f"\nШаг 6.2: Строим операторы Крауса:")
 
     for i in range(len(eigenvalues_positive)):
         sqrt_eigenvalue = np.sqrt(eigenvalues_positive[i])
@@ -330,17 +321,22 @@ def step_by_step_demo():
 
     # Проверка полноты
     completeness = sum(K.conj().T @ K for K in kraus_operators)
-    print(f"\nШаг 7.3: Проверка полноты (Σᵢ K†ᵢKᵢ = I):")
+    print(f"\nШаг 6.3: Проверка полноты (Σᵢ K†ᵢKᵢ = I):")
     print_matrix(completeness, "  Σᵢ K†ᵢKᵢ")
 
     completeness_error = np.linalg.norm(completeness - np.eye(2))
     print(f"  Ошибка: {completeness_error:.6e}")
+    if completeness_error < 1e-6:
+        print(f"  ✓ Условие полноты выполнено")
+    else:
+        print(f"  ⚠ Условие полноты нарушено")
+
     print_section("ШАГ 7: Анализ качества реконструкции", 1)
 
     print("\nСравниваем реконструированный канал с истинным")
 
     # Process Fidelity
-    fidelity = process_fidelity_choi(choi_true, choi_cptp)
+    fidelity = process_fidelity_choi(choi_true, choi_reconstructed)
 
     print(f"\n1. Process Fidelity:")
     print(f"   F = Tr(χ_true · χ_reconstructed) = {fidelity:.8f}")
@@ -354,7 +350,7 @@ def step_by_step_demo():
         print(f"   ⚠ Требуется улучшение")
 
     # Frobenius distance
-    frobenius_dist = np.linalg.norm(choi_true - choi_cptp, ord='fro')
+    frobenius_dist = np.linalg.norm(choi_true - choi_reconstructed, ord='fro')
     print(f"\n2. Frobenius distance:")
     print(f"   ||χ_true - χ_reconstructed||_F = {frobenius_dist:.8f}")
 

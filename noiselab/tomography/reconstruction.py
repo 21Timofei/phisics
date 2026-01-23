@@ -30,9 +30,6 @@ class LinearInversion:
     """
 
     def __init__(self):
-        """
-        Линейная инверсия для 1 кубита
-        """
         self.n_qubits = 1
         self.dim = 2
 

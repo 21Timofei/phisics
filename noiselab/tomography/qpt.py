@@ -176,8 +176,6 @@ class QuantumProcessTomography:
             # Реконструируем состояния из измерений (state tomography)
             reconstructed_output_states = self._reconstruct_states_from_measurements(measurement_data)
             reconstructed = self._reconstruct_lsq(reconstructed_output_states)
-        elif reconstruction_method == 'MLE':
-            reconstructed = self._reconstruct_mle(measurement_data)
         else:
             raise ValueError(f"Неизвестный метод: {reconstruction_method}")
 

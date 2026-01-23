@@ -7,9 +7,6 @@ matplotlib>=3.7.0
 qiskit>=0.45.0
 qiskit-aer>=0.13.0
 
-# Численная оптимизация для MLE
-cvxpy>=1.4.0
-
 # Веб-фреймворк для API
 flask>=3.0.0
 flask-cors>=4.0.0

@@ -43,21 +43,12 @@ def print_matrix(matrix: np.ndarray, name: str = "Matrix"):
 
 
 def step_by_step_demo():
-    """
-    Пошаговая демонстрация QPT с детальным выводом
-    """
-
     print_section("ПОШАГОВАЯ ДЕМОНСТРАЦИЯ КВАНТОВОЙ ПРОЦЕССНОЙ ТОМОГРАФИИ", 1)
-
     print_section("ШАГ 0: Создание неизвестного квантового канала", 1)
-
     p = 0.15
     channel = DepolarizingChannel(p)
 
     print(f"\n✓ Создан деполяризующий канал: p = {p}")
-    print(f"\nФизический смысл:")
-    print(f"  • С вероятностью (1-p) = {1-p:.3f} → состояние не меняется")
-    print(f"  • С вероятностью p = {p:.3f} → применяется случайная паули-ошибка")
 
     print(f"\nОператоры Крауса:")
     for i, K in enumerate(channel.kraus_operators):
@@ -143,10 +134,7 @@ def step_by_step_demo():
 
     measurement_data.append(state_measurements)
 
-    # Остальные состояния без деталей
-    print(f"\n{'─' * 80}")
-    print("Измеряем остальные 3 состояния...")
-
+    # Измеряем остальные 3 состояния без детального вывода
     for rho_out in output_states[1:]:
         state_measurements = {}
         for basis in ['X', 'Y', 'Z']:
@@ -154,10 +142,6 @@ def step_by_step_demo():
             counts = measurement.measure(rho_out, shots=shots)
             state_measurements[basis] = counts
         measurement_data.append(state_measurements)
-
-    print(f"✓ Всего проведено {len(output_states) * 3} серий измерений")
-    print(f"✓ Общее число квантовых измерений: {len(output_states) * 3 * shots}")
-
 
     print_section("ШАГ 4: Реконструкция выходных состояний из измерений", 1)
 
@@ -201,8 +185,6 @@ def step_by_step_demo():
 
     # Проверяем физичность
     eigenvalues = np.linalg.eigvalsh(rho_raw)
-    print(f"\nШаг 4.3: Проверка физичности:")
-    print(f"  Собственные значения: {[f'{ev:.6f}' for ev in eigenvalues]}")
 
     if np.any(eigenvalues < -1e-10):
         print(f"  ⚠ Есть отрицательные! Обрезаем их до 0")
@@ -215,7 +197,7 @@ def step_by_step_demo():
 
     # Нормализация
     trace = np.trace(rho_physical).real
-    print(f"\nШаг 4.4: Нормализация:")
+    print(f"\nШаг 4.3: Нормализация:")
     print(f"  Trace = {trace:.6f} (должно быть 1.0)")
 
     if abs(trace - 1.0) > 1e-6:
@@ -234,7 +216,6 @@ def step_by_step_demo():
 
     reconstructed_states.append(DensityMatrix(rho_physical))
 
-    # Остальные состояния без деталей
     print(f"\n{'─' * 80}")
     print("Реконструируем остальные 3 состояния...")
 
@@ -256,13 +237,12 @@ def step_by_step_demo():
 
         reconstructed_states.append(DensityMatrix(rho))
 
-    print(f"✓ Реконструировано {len(reconstructed_states)} состояний")
+    print(f"Реконструировано {len(reconstructed_states)} состояний")
 
 
     print_section("ШАГ 5: Построение Choi matrix канала", 1)
 
     print("\nChoi matrix строится из соответствий: входные состояния → выходные состояния")
-    print("Используем метод линейной инверсии (LSQ)")
 
     from noiselab.tomography.reconstruction import LinearInversion
 
@@ -280,56 +260,35 @@ def step_by_step_demo():
     print(f"  Собственные значения: {[f'{ev:.6f}' for ev in eigenvalues_raw]}")
     print(f"  Минимальное: {np.min(eigenvalues_raw):.6e}")
     print(f"  Отрицательных: {np.sum(eigenvalues_raw < -1e-10)}")
-    print(f"  Trace: {trace_raw:.6f} (должно быть 2.0)")
 
-    # Используем сырую матрицу без CPTP проекции
     choi_reconstructed = choi_raw
     eigenvalues_final = eigenvalues_raw
 
 
     print_section("ШАГ 6: Извлечение операторов Крауса", 1)
 
-    print("\nИз Choi matrix извлекаем операторы Крауса через спектральное разложение")
+    print("\nИз Choi matrix извлекаем операторы Крауса")
     print("χ = Σᵢ λᵢ |vᵢ⟩⟨vᵢ|  →  Kᵢ = √λᵢ · reshape(|vᵢ⟩, (2,2))")
 
-    threshold = 1e-10
-    positive_indices = eigenvalues_final > threshold
-    eigenvalues_positive = eigenvalues_final[positive_indices]
+    from noiselab.representations.kraus_decomp import kraus_decomposition, analyze_kraus_structure
 
-    print(f"\nШаг 6.1: Отбираем значимые собственные значения:")
-    print(f"  Порог: {threshold:.2e}")
-    print(f"  Значимых: {len(eigenvalues_positive)} из {len(eigenvalues_final)}")
-    print(f"  Ранг Крауса: {len(eigenvalues_positive)}")
+    kraus_operators = kraus_decomposition(choi_reconstructed)
 
-    eigenvectors = np.linalg.eigh(choi_reconstructed)[1]
-    kraus_operators = []
+    print(f"\nПолучено операторов Крауса: {len(kraus_operators)}")
+    print(f"Ранг Крауса: {len(kraus_operators)}")
 
-    print(f"\nШаг 6.2: Строим операторы Крауса:")
+    # Анализируем структуру операторов
+    analysis = analyze_kraus_structure(kraus_operators)
 
-    for i in range(len(eigenvalues_positive)):
-        sqrt_eigenvalue = np.sqrt(eigenvalues_positive[i])
-        vec = eigenvectors[:, positive_indices][:, i]
-        K = sqrt_eigenvalue * vec.reshape(2, 2)
-        kraus_operators.append(K)
+    print(f"\nОператоры Крауса:")
+    print("-" * 60)
 
-        print(f"\n  K_{i} (вес λ_{i} = {eigenvalues_positive[i]:.6f}):")
-        print_matrix(K, f"    K_{i}")
+    for i, k in enumerate(kraus_operators):
+        print(f"\nK_{i}:")
+        print_matrix(k, f"  K_{i}")
 
-        # Проверка
-        norm_sq = np.trace(K.conj().T @ K).real
-        print(f"    Tr(K†K) = {norm_sq:.6f}")
 
-    # Проверка полноты
-    completeness = sum(K.conj().T @ K for K in kraus_operators)
-    print(f"\nШаг 6.3: Проверка полноты (Σᵢ K†ᵢKᵢ = I):")
-    print_matrix(completeness, "  Σᵢ K†ᵢKᵢ")
 
-    completeness_error = np.linalg.norm(completeness - np.eye(2))
-    print(f"  Ошибка: {completeness_error:.6e}")
-    if completeness_error < 1e-6:
-        print(f"  ✓ Условие полноты выполнено")
-    else:
-        print(f"  ⚠ Условие полноты нарушено")
 
     print_section("ШАГ 7: Анализ качества реконструкции", 1)
 

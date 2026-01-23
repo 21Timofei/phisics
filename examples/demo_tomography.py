@@ -9,6 +9,33 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import numpy as np
 from noiselab.channels.noise_models import DepolarizingChannel, AmplitudeDampingChannel
+
+
+def print_section(title: str, level: int = 1):
+    if level == 1:
+        print("\n" + "=" * 80)
+        print(f"  {title}")
+        print("=" * 80)
+    elif level == 2:
+        print("\n" + "-" * 80)
+        print(f"  {title}")
+        print("-" * 80)
+    else:
+        print(f"\n>>> {title}")
+
+
+def print_matrix(matrix: np.ndarray, name: str = "Matrix"):
+    print(f"\n{name}:")
+    if matrix.shape[0] <= 4:
+        for i, row in enumerate(matrix):
+            row_str = f"  [{i}] "
+            for val in row:
+                if np.abs(val.imag) < 1e-10:
+                    row_str += f"{val.real:+7.4f}      "
+                else:
+                    row_str += f"{val.real:+6.3f}{val.imag:+6.3f}j "
+            print(row_str)
+    print(f"  Размер: {matrix.shape}, Trace: {np.trace(matrix):.6f}")
 from noiselab.tomography.qpt import QuantumProcessTomography
 from noiselab.metrics.validation import analyze_tomography_quality, estimate_error_rates
 from noiselab.channels.kraus import KrausChannel
@@ -18,9 +45,7 @@ def demo_single_qubit_depolarizing():
     """
     Демонстрация томографии деполяризующего канала на 1 кубите
     """
-    print("=" * 70)
-    print("ДЕМОНСТРАЦИЯ 1: Томография деполяризующего канала (1 кубит)")
-    print("=" * 70)
+    print_section("ДЕМОНСТРАЦИЯ 1: Томография деполяризующего канала (1 кубит)", 1)
 
     # 1. Создаём неизвестный канал с заданным параметром
     true_parameter = 0.1
@@ -32,15 +57,12 @@ def demo_single_qubit_depolarizing():
     # 2. Инициализируем QPT
     qpt = QuantumProcessTomography(shots=1000)
 
-    print("\n" + "="*70)
-    print("ВХОДНЫЕ СОСТОЯНИЯ:")
-    print("="*70)
+    print_section("ВХОДНЫЕ СОСТОЯНИЯ", 2)
     for i, state in enumerate(qpt.input_states, 1):
-        print(f"\nСостояние {i}:")
-        print(state.matrix)
+        print_matrix(state.matrix, f"Состояние {i}")
 
     # 3. Проводим томографию
-    print("\n📊 Запуск томографии...")
+    print(f"\n>>> Запуск томографии...")
     result = qpt.run_tomography(
         unknown_channel,
         reconstruction_method='LSQ',
@@ -48,9 +70,7 @@ def demo_single_qubit_depolarizing():
     )
 
     # 4. Анализ качества
-    print("\n" + "="*70)
-    print("РЕЗУЛЬТАТЫ ТОМОГРАФИИ")
-    print("="*70)
+    print_section("РЕЗУЛЬТАТЫ ТОМОГРАФИИ", 1)
 
     quality = analyze_tomography_quality(result)
 
@@ -60,23 +80,6 @@ def demo_single_qubit_depolarizing():
     print(f"✓ Реконструированный ранг: {quality['kraus_rank']}")
     print(f"✓ Число операторов Крауса: {quality['n_kraus_operators']}")
 
-    # 5. Оценка параметра
-    print("\n" + "-"*70)
-    print("ОЦЕНКА ПАРАМЕТРОВ ШУМА")
-    print("-"*70)
-
-    identity_channel = KrausChannel.from_unitary(np.eye(2), name="Identity")
-    estimated = estimate_error_rates(
-        result.reconstructed_channel,
-        identity_channel,
-        error_model='depolarizing'
-    )
-
-    print(f"\n✓ Истинный параметр p: {true_parameter:.6f}")
-    print(f"✓ Оценённый параметр p: {estimated['parameter']:.6f}")
-    print(f"✓ Ошибка оценки: {abs(estimated['parameter'] - true_parameter):.6f}")
-    print(f"✓ Fit fidelity: {estimated['fit_fidelity']:.6f}")
-
     return result
 
 
@@ -84,9 +87,7 @@ def demo_amplitude_damping():
     """
     Демонстрация томографии amplitude damping канала
     """
-    print("\n\n" + "=" * 70)
-    print("ДЕМОНСТРАЦИЯ 2: Томография Amplitude Damping канала")
-    print("=" * 70)
+    print_section("ДЕМОНСТРАЦИЯ 2: Томография Amplitude Damping канала", 1)
 
     # Создаём канал с затуханием
     true_gamma = 0.3
@@ -97,83 +98,26 @@ def demo_amplitude_damping():
     # QPT
     qpt = QuantumProcessTomography(shots=2000)
 
-    print("\n📊 Запуск томографии...")
+    print(f"\n>>> Запуск томографии...")
     result = qpt.run_tomography(unknown_channel, reconstruction_method='LSQ')
 
     print(f"\n✓ Process Fidelity: {result.process_fidelity:.6f}")
 
-    # Оценка параметра
-    identity_channel = KrausChannel.from_unitary(np.eye(2), name="Identity")
-    estimated = estimate_error_rates(
-        result.reconstructed_channel,
-        identity_channel,
-        error_model='amplitude_damping'
-    )
-
-    print(f"\n✓ Истинный γ: {true_gamma:.6f}")
-    print(f"✓ Оценённый γ: {estimated['parameter']:.6f}")
-    print(f"✓ Ошибка: {abs(estimated['parameter'] - true_gamma):.6f}")
-
     return result
-
-
-def demo_statistical_analysis():
-    """
-    Демонстрация статистического анализа (N прогонов томографии)
-    """
-    print("\n\n" + "=" * 70)
-    print("ДЕМОНСТРАЦИЯ 3: Статистический анализ (10 прогонов)")
-    print("=" * 70)
-
-    unknown_channel = DepolarizingChannel(0.15)
-    qpt = QuantumProcessTomography(shots=1000)
-
-    print("\n📊 Запуск 10 независимых томографий...")
-    results = qpt.run_multiple_tomographies(
-        unknown_channel,
-        n_runs=10,
-        reconstruction_method='LSQ'
-    )
-
-    # Статистический анализ
-    from noiselab.metrics.validation import statistical_analysis_multiple_runs
-
-    stats = statistical_analysis_multiple_runs(results)
-
-    print("\n" + "="*70)
-    print("СТАТИСТИКА")
-    print("="*70)
-
-    print(f"\n✓ Средняя fidelity: {stats['fidelity']['mean']:.6f} ± {stats['fidelity']['std']:.6f}")
-    print(f"✓ Мин/Макс: {stats['fidelity']['min']:.6f} / {stats['fidelity']['max']:.6f}")
-    print(f"✓ Медиана: {stats['fidelity']['median']:.6f}")
-    print(f"\n✓ Средний ранг Крауса: {stats['kraus_rank']['mean']:.2f}")
-    print(f"✓ Наиболее частый ранг: {stats['kraus_rank']['mode']}")
-
-    return results
-
-
 
 
 def main():
     """
     Главная функция демонстрации
     """
-    print("\n" + "#" * 70)
-    print("#" + " " * 68 + "#")
-    print("#" + " " * 15 + "NoiseLab++ DEMO: Квантовая томография" + " " * 15 + "#")
-    print("#" + " " * 68 + "#")
-    print("#" * 70)
+    print_section("NoiseLab++ DEMO: Квантовая томография", 1)
 
     # Запускаем демонстрации
     try:
         result1 = demo_single_qubit_depolarizing()
         result2 = demo_amplitude_damping()
-        result3 = demo_statistical_analysis()
 
-        print("\n\n" + "=" * 70)
-        print("✓ ВСЕ ДЕМОНСТРАЦИИ ВЫПОЛНЕНЫ УСПЕШНО!")
-        print("=" * 70)
+        print_section("ВСЕ ДЕМОНСТРАЦИИ ВЫПОЛНЕНЫ УСПЕШНО!", 1)
         print("\nДемонстрация показала:")
         print("  • Томографию различных типов шумовых каналов (1 кубит)")
         print("  • Оценку параметров шума с высокой точностью")

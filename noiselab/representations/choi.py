@@ -28,19 +28,17 @@ class ChoiRepresentation:
     3. Ранг J = минимальное число операторов Крауса
     """
 
-    def __init__(self, choi_matrix: NDArray[np.complex128], n_qubits: int):
+    def __init__(self, choi_matrix: NDArray[np.complex128]):
         """
         Args:
-            choi_matrix: Матрица Чои размера (d²×d²)
-            n_qubits: Число кубитов
+            choi_matrix: Матрица Чои размера 4×4 (для 1 кубита)
         """
-        self.n_qubits = n_qubits
-        self.dim = 2 ** n_qubits
+        self.n_qubits = 1
+        self.dim = 2
         self.choi_matrix = choi_matrix
 
-        expected_dim = self.dim ** 2
-        if choi_matrix.shape != (expected_dim, expected_dim):
-            raise ValueError(f"Неправильная размерность Choi matrix: {choi_matrix.shape}")
+        if choi_matrix.shape != (4, 4):
+            raise ValueError(f"Неправильная размерность Choi matrix: {choi_matrix.shape}, ожидается (4, 4)")
 
     def is_completely_positive(self, tol: float = 1e-10) -> bool:
         """
@@ -196,40 +194,35 @@ class ChoiRepresentation:
         Создать из квантового канала
 
         Args:
-            channel: QuantumChannel объект
+            channel: QuantumChannel объект (1 кубит)
 
         Returns:
             ChoiRepresentation
         """
         choi = channel.get_choi_matrix()
-        return cls(choi, channel.n_qubits)
+        return cls(choi)
 
     @classmethod
-    def from_kraus(cls, kraus_operators: List[NDArray[np.complex128]],
-                   n_qubits: int) -> 'ChoiRepresentation':
+    def from_kraus(cls, kraus_operators: List[NDArray[np.complex128]]) -> 'ChoiRepresentation':
         """
         Создать из операторов Крауса
 
         J = Σᵢ vec(Kᵢ) vec(Kᵢ)†
 
         Args:
-            kraus_operators: Список операторов Крауса
-            n_qubits: Число кубитов
+            kraus_operators: Список операторов Крауса (2×2 матрицы)
 
         Returns:
             ChoiRepresentation
         """
-        dim = 2 ** n_qubits
-        choi_dim = dim ** 2
-
-        choi = np.zeros((choi_dim, choi_dim), dtype=np.complex128)
+        choi = np.zeros((4, 4), dtype=np.complex128)
 
         for K in kraus_operators:
             # Векторизация K
             vec_K = K.reshape(-1, 1)
             choi += vec_K @ vec_K.conj().T
 
-        return cls(choi, n_qubits)
+        return cls(choi)
 
     def __repr__(self) -> str:
         cptp_str = "CPTP" if self.is_cptp() else "non-CPTP"

@@ -9,7 +9,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from noiselab.core.states import QuantumState, DensityMatrix
-from noiselab.core.gates import PauliGates, RotationGates, TwoQubitGates
+from noiselab.core.gates import PauliGates, RotationGates
 from noiselab.core.measurements import PauliMeasurement
 
 
@@ -163,38 +163,13 @@ class TestRotationGates:
         assert np.isclose(new_state.probability(1), 0.5, atol=0.01)
 
 
-class TestTwoQubitGates:
-    """Тесты для двухкубитных гейтов"""
-
-    def test_cnot(self):
-        """Тест CNOT: |10⟩ → |11⟩"""
-        CNOT = TwoQubitGates.cnot(control=0, target=1)
-
-        # |10⟩ = |1⟩ ⊗ |0⟩
-        state = QuantumState.computational_basis_state(2, 2)  # |10⟩
-
-        new_state = CNOT.apply(state)
-
-        # Должно получиться |11⟩
-        assert np.isclose(new_state.probability(3), 1.0)  # |11⟩ = index 3
-
-    def test_cnot_preserves_00(self):
-        """Тест CNOT: |00⟩ → |00⟩"""
-        CNOT = TwoQubitGates.cnot()
-        state = QuantumState.zero_state(2)  # |00⟩
-
-        new_state = CNOT.apply(state)
-
-        assert np.isclose(new_state.probability(0), 1.0)
-
-
 class TestPauliMeasurement:
     """Тесты для измерений"""
 
     def test_z_measurement(self):
         """Тест измерения в Z базисе"""
         state = QuantumState([1, 0], normalize=False).to_density_matrix()
-        measurement = PauliMeasurement('Z', qubit_index=0, n_qubits=1)
+        measurement = PauliMeasurement('Z')
 
         counts = measurement.measure(state, shots=100)
 
@@ -205,7 +180,7 @@ class TestPauliMeasurement:
         """Тест измерения в X базисе"""
         # |+⟩ - собственное состояние X с собственным значением +1
         state = QuantumState([1, 1], normalize=True).to_density_matrix()
-        measurement = PauliMeasurement('X', qubit_index=0, n_qubits=1)
+        measurement = PauliMeasurement('X')
 
         counts = measurement.measure(state, shots=100)
 

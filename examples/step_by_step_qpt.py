@@ -50,9 +50,6 @@ def step_by_step_demo():
 
     print_section("ПОШАГОВАЯ ДЕМОНСТРАЦИЯ КВАНТОВОЙ ПРОЦЕССНОЙ ТОМОГРАФИИ", 1)
 
-    # ============================================================================
-    # ШАГ 0: Создание канала
-    # ============================================================================
     print_section("ШАГ 0: Создание неизвестного квантового канала", 1)
 
     p = 0.15
@@ -71,9 +68,6 @@ def step_by_step_demo():
     choi_true = channel.get_choi_matrix()
     print_matrix(choi_true, "Истинная Choi matrix")
 
-    # ============================================================================
-    # ШАГ 1: Подготовка входных состояний
-    # ============================================================================
     print_section("ШАГ 1: Подготовка входных состояний", 1)
 
     print("\nДля томографии нужен информационно-полный набор состояний")
@@ -95,9 +89,7 @@ def step_by_step_demo():
         purity = np.trace(state.matrix @ state.matrix).real
         print(f"  Чистота: {purity:.6f}")
 
-    # ============================================================================
-    # ШАГ 2: Применение канала
-    # ============================================================================
+
     print_section("ШАГ 2: Применение канала к входным состояниям", 1)
 
     print("\nПрименяем канал ε к каждому входному состоянию: ρ_out = ε(ρ_in)")
@@ -123,9 +115,7 @@ def step_by_step_demo():
         print(f"    Чистота: {purity_in:.6f} → {purity_out:.6f}")
         print(f"    Потеря чистоты: {purity_in - purity_out:.6f}")
 
-    # ============================================================================
-    # ШАГ 3: Измерения
-    # ============================================================================
+
     print_section("ШАГ 3: Измерения выходных состояний", 1)
 
     print("\nПроводим измерения в паули-базисах: X, Y, Z")
@@ -145,7 +135,7 @@ def step_by_step_demo():
     for basis in ['X', 'Y', 'Z']:
         print(f"\n>>> Измерение в базисе {basis}")
 
-        measurement = PauliMeasurement(basis, qubit_index=0, n_qubits=1)
+        measurement = PauliMeasurement(basis)
         counts = measurement.measure(rho_out, shots=shots)
         state_measurements[basis] = counts
 
@@ -171,7 +161,7 @@ def step_by_step_demo():
     for rho_out in output_states[1:]:
         state_measurements = {}
         for basis in ['X', 'Y', 'Z']:
-            measurement = PauliMeasurement(basis, qubit_index=0, n_qubits=1)
+            measurement = PauliMeasurement(basis)
             counts = measurement.measure(rho_out, shots=shots)
             state_measurements[basis] = counts
         measurement_data.append(state_measurements)
@@ -179,9 +169,7 @@ def step_by_step_demo():
     print(f"✓ Всего проведено {len(output_states) * 3} серий измерений")
     print(f"✓ Общее число квантовых измерений: {len(output_states) * 3 * shots}")
 
-    # ============================================================================
-    # ШАГ 4: Реконструкция состояний
-    # ============================================================================
+
     print_section("ШАГ 4: Реконструкция выходных состояний из измерений", 1)
 
     print("\nИспользуем формулу:")
@@ -281,9 +269,7 @@ def step_by_step_demo():
 
     print(f"✓ Реконструировано {len(reconstructed_states)} состояний")
 
-    # ============================================================================
-    # ШАГ 5: Построение Choi matrix
-    # ============================================================================
+
     print_section("ШАГ 5: Построение Choi matrix канала", 1)
 
     print("\nChoi matrix строится из соответствий: входные состояния → выходные состояния")
@@ -291,7 +277,7 @@ def step_by_step_demo():
 
     from noiselab.tomography.reconstruction import LinearInversion
 
-    lin_inv = LinearInversion(n_qubits=1)
+    lin_inv = LinearInversion()
     choi_raw = lin_inv.reconstruct_choi(input_states, reconstructed_states)
 
     print(f"\nШаг 5.1: Построена сырая Choi matrix")
@@ -312,24 +298,8 @@ def step_by_step_demo():
     partial_trace_raw = np.trace(choi_reshaped.transpose(0, 2, 1, 3).reshape(4, 4))
     tp_error_raw = np.abs(partial_trace_raw - 2.0)
 
-    print(f"\nШаг 5.3: Проверка CPTP:")
-    print(f"  Complete Positivity (CP):")
-    if np.all(eigenvalues_raw > -1e-10):
-        print(f"    ✓ Выполнено (все собственные значения ≥ 0)")
-    else:
-        print(f"    ✗ Нарушено (есть отрицательные собственные значения)")
 
-    print(f"  Trace Preservation (TP):")
-    print(f"    Tr_2(χ) = {partial_trace_raw:.6f} (должно быть 2.0)")
-    print(f"    TP error = {tp_error_raw:.6e}")
-    if tp_error_raw < 1e-6:
-        print(f"    ✓ Выполнено")
-    else:
-        print(f"    ✗ Нарушено")
 
-    # ============================================================================
-    # ШАГ 6: Проекция на CPTP
-    # ============================================================================
     print_section("ШАГ 6: Проекция на множество CPTP каналов", 1)
 
     print("\nЧтобы гарантировать физичность, применяем проекцию на CPTP")
@@ -337,14 +307,7 @@ def step_by_step_demo():
 
     needs_projection = (np.any(eigenvalues_raw < -1e-10) or tp_error_raw > 1e-6)
 
-    if needs_projection:
-        print(f"\n⚠ Матрица НЕ физична - проекция НЕОБХОДИМА")
-        if np.any(eigenvalues_raw < -1e-10):
-            print(f"  Причина 1: Отрицательные собственные значения")
-        if tp_error_raw > 1e-6:
-            print(f"  Причина 2: Нарушено Trace Preservation (TP error = {tp_error_raw:.2e})")
-    else:
-        print(f"\n✓ Матрица уже физична, но применяем проекцию для гарантии")
+
 
     print(f"\nШаг 6.1: Применяем проекцию...")
     choi_cptp = lin_inv._project_to_cptp(choi_raw)
@@ -382,9 +345,7 @@ def step_by_step_demo():
     else:
         print(f"  → Значительные изменения (зашумленные измерения)")
 
-    # ============================================================================
-    # ШАГ 7: Извлечение операторов Крауса
-    # ============================================================================
+
     print_section("ШАГ 7: Извлечение операторов Крауса", 1)
 
     print("\nИз Choi matrix извлекаем операторы Крауса через спектральное разложение")
@@ -429,9 +390,6 @@ def step_by_step_demo():
     else:
         print(f"  ⚠ Условие полноты нарушено")
 
-    # ============================================================================
-    # ШАГ 8: Анализ качества
-    # ============================================================================
     print_section("ШАГ 8: Анализ качества реконструкции", 1)
 
     print("\nСравниваем реконструированный канал с истинным")
@@ -462,16 +420,8 @@ def step_by_step_demo():
     if len(kraus_operators) > 0:
         K0_coeff = np.abs(kraus_operators[0][0, 0])
         estimated_p = 4 * (1 - K0_coeff**2) / 3
-        error = abs(estimated_p - p)
-        rel_error = error / p * 100
 
-        print(f"   Оценённый p: {estimated_p:.6f}")
-        print(f"   Абсолютная ошибка: {error:.6f}")
-        print(f"   Относительная ошибка: {rel_error:.2f}%")
 
-    # ============================================================================
-    # ФИНАЛЬНЫЙ ОТЧЕТ
-    # ============================================================================
     print_section("ФИНАЛЬНЫЙ ОТЧЕТ", 1)
 
     print("\n" + "=" * 80)
@@ -495,12 +445,6 @@ def step_by_step_demo():
     print(f"\n4. КАЧЕСТВО:")
     print(f"   Process Fidelity: {fidelity:.8f}")
     print(f"   Frobenius distance: {frobenius_dist:.8f}")
-    print(f"   Оценка параметра: {estimated_p:.6f} (истинный: {p:.6f})")
-
-    print(f"\n5. CPTP ПРОВЕРКА:")
-    print(f"   Complete Positivity: {'✓ PASSED' if np.all(eigenvalues_cptp > -1e-10) else '✗ FAILED'}")
-    print(f"   Trace Preservation: {'✓ PASSED' if tp_error_cptp < 1e-6 else '✗ FAILED'}")
-    print(f"   Полнота Крауса: {'✓ PASSED' if completeness_error < 1e-6 else '✗ FAILED'}")
 
     print("\n" + "=" * 80)
     print("  ДЕМОНСТРАЦИЯ ЗАВЕРШЕНА")

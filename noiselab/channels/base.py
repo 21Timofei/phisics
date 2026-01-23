@@ -61,16 +61,17 @@ class QuantumChannel(ABC):
 
     def validate_cptp(self, tol: float = 1e-10) -> bool:
         """
-        Проверка CPTP условий:
-        1. Trace-preserving: Σᵢ Kᵢ†Kᵢ = I
-        2. Completely positive: Choi matrix ≥ 0
+        Args:
+            tol: Допустимая численная погрешность
 
         Returns:
-            True если канал CPTP
+            True если канал CPTP (физически корректен)
         """
         kraus_ops = self.get_kraus_operators()
 
-        # Проверка trace-preserving
+        # === ПРОВЕРКА 1: Trace-Preserving ===
+        # Вычисляем сумму Σᵢ Kᵢ†Kᵢ
+        # Для TP канала эта сумма должна быть единичной матрицей
         sum_kraus = sum(K.conj().T @ K for K in kraus_ops)
         identity = np.eye(self.dim, dtype=np.complex128)
 
@@ -78,7 +79,8 @@ class QuantumChannel(ABC):
             print(f"Канал не trace-preserving: ||ΣKᵢ†Kᵢ - I|| = {np.linalg.norm(sum_kraus - identity)}")
             return False
 
-        # Проверка completely positive через Choi matrix
+        # Канал CP тогда и только тогда, когда его Choi matrix
+        # является положительно полуопределённой (все собственные значения ≥ 0)
         choi = self.get_choi_matrix()
         eigenvalues = np.linalg.eigvalsh(choi)
 
@@ -92,12 +94,19 @@ class QuantumChannel(ABC):
         """
         Вычислить матрицу Чои (Choi-Jamiolkowski representation)
 
-        J(ε) = (I ⊗ ε)(|Φ⁺⟩⟨Φ⁺|)
-        где |Φ⁺⟩ = Σᵢ|i⟩|i⟩/√d - максимально запутанное состояние
+        Choi matrix - это полное математическое представление квантового канала.
+        Два канала эквивалентны тогда и только тогда, когда их Choi matrices совпадают.
 
-        Альтернативная формула через операторы Крауса:
+        === Математическое определение ===
+        J(ε) = (I ⊗ ε)(|Φ⁺⟩⟨Φ⁺|)
+        где |Φ⁺⟩ = Σᵢ|i⟩|i⟩/√d - максимально запутанное состояние (Bell state)
+
+
+        === Формула через операторы Крауса ===
         J(ε) = Σᵢ vec(Kᵢ) vec(Kᵢ)†
-        где vec - векторизация матрицы
+        где vec(K) - векторизация матрицы K (столбцовая развёртка)
+
+        Для матрицы K = [[a, b], [c, d]] имеем vec(K) = [a, c, b, d]ᵀ
 
         Returns:
             Choi matrix размера (d² × d²)
@@ -110,17 +119,35 @@ class QuantumChannel(ABC):
 
         for K in kraus_ops:
             # Векторизация: vec(K) - столбцовая развёртка матрицы K
+            # Для матрицы 2×2: K = [[K00, K01], [K10, K11]]
+            # vec(K) = [K00, K10, K01, K11]ᵀ (column-major порядок)
             vec_K = K.reshape(-1, 1)
+
+            # Добавляем внешнее произведение: vec(K) ⊗ vec(K)†
             choi += vec_K @ vec_K.conj().T
 
         return choi
 
     def compose(self, other: 'QuantumChannel') -> 'QuantumChannel':
         """
-        Композиция каналов: ε₁ ∘ ε₂ (сначала ε₂, потом ε₁)
+        Композиция (последовательное применение) квантовых каналов
+
+        (ε₁ ∘ ε₂)(ρ) = ε₁(ε₂(ρ))
+
+        Сначала применяется канал other (ε₂), затем self (ε₁).
+
 
         Результат - новый канал с операторами Крауса:
         {K^(1)_i K^(2)_j} для всех пар i, j
+
+        === Число операторов ===
+        Если ε₁ имеет n₁ операторов, а ε₂ имеет n₂ операторов,
+        то композиция имеет n₁ × n₂ операторов
+        Args:
+            other: Второй канал (применяется первым)
+
+        Returns:
+            Композиция каналов self ∘ other
         """
         from .kraus import KrausChannel
 
@@ -131,6 +158,7 @@ class QuantumChannel(ABC):
         kraus2 = other.get_kraus_operators()
 
         # Композиция: все произведения K₁ᵢ @ K₂ⱼ
+        # Матричное произведение соответствует последовательному применению
         composed_kraus = [
             K1 @ K2
             for K1 in kraus1
@@ -144,17 +172,21 @@ class QuantumChannel(ABC):
 
     def tensor(self, other: 'QuantumChannel') -> 'QuantumChannel':
         """
-        Тензорное произведение каналов: ε₁ ⊗ ε₂
+        Тензорное произведение (параллельное применение) квантовых каналов
+        Применяет ε₁ к первым n₁ кубитам и ε₂ к следующим n₂ кубитам независимо.
 
-        Результат - канал на (n₁ + n₂) кубитах с операторами:
-        {K^(1)_i ⊗ K^(2)_j}
+        Args:
+            other: Второй канал (применяется к другим кубитам)
+
+        Returns:
+            Тензорное произведение каналов self ⊗ other
         """
         from .kraus import KrausChannel
 
         kraus1 = self.get_kraus_operators()
         kraus2 = other.get_kraus_operators()
 
-        # Тензорное произведение всех пар
+        # Тензорное произведение всех пар операторов
         tensor_kraus = [
             np.kron(K1, K2)
             for K1 in kraus1

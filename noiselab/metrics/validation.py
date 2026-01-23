@@ -113,7 +113,7 @@ def estimate_error_rates(reconstructed_channel,
                         ideal_channel,
                         error_model: str = 'depolarizing') -> Dict[str, float]:
     """
-    Оценка параметров ошибок из реконструированного канала
+    Оценка параметров ошибок из реконструированного канала (1 кубит)
 
     Использует прямой анализ Choi matrix для более точной оценки параметров
     вместо подгонки через сравнение fidelity.
@@ -132,44 +132,71 @@ def estimate_error_rates(reconstructed_channel,
         AmplitudeDampingChannel
     )
 
-    n_qubits = reconstructed_channel.n_qubits
-
     if error_model == 'depolarizing':
         # МЕТОД: Прямое сравнение с теоретическими каналами через diamond distance
         # Используем более точную метрику - diamond distance или trace distance
 
         try:
-            if n_qubits == 1:
-                # Для 1-кубитного случая используем прямое сравнение
-                # Применяем оба канала к набору тестовых состояний и сравниваем выходы
+            # Для 1-кубитного случая используем прямое сравнение
+            # Применяем оба канала к набору тестовых состояний и сравниваем выходы
 
-                # Генерируем тестовые состояния
-                test_states = []
-                for theta in np.linspace(0, np.pi, 5):
-                    for phi in np.linspace(0, 2*np.pi, 5):
-                        # Состояние на сфере Блоха
-                        psi = np.array([np.cos(theta/2),
-                                       np.exp(1j*phi)*np.sin(theta/2)],
-                                      dtype=np.complex128)
-                        from ..core.states import QuantumState, DensityMatrix
-                        test_states.append(QuantumState(psi).to_density_matrix())
+            # Генерируем тестовые состояния
+            test_states = []
+            for theta in np.linspace(0, np.pi, 5):
+                for phi in np.linspace(0, 2*np.pi, 5):
+                    # Состояние на сфере Блоха
+                    psi = np.array([np.cos(theta/2),
+                                   np.exp(1j*phi)*np.sin(theta/2)],
+                                  dtype=np.complex128)
+                    from ..core.states import QuantumState, DensityMatrix
+                    test_states.append(QuantumState(psi).to_density_matrix())
 
-                # Для каждого значения p вычисляем среднее расстояние
-                best_p = 0.0
-                min_distance = float('inf')
+            # Для каждого значения p вычисляем среднее расстояние
+            best_p = 0.0
+            min_distance = float('inf')
 
-                for p in np.linspace(0, 0.5, 100):
+            for p in np.linspace(0, 0.5, 100):
+                try:
+                    noise = DepolarizingChannel(p)
+                    noisy_channel = ideal_channel.compose(noise)
+
+                    # Вычисляем среднее расстояние между выходами
+                    total_distance = 0.0
+                    for rho in test_states:
+                        rho_recon = reconstructed_channel.apply(rho)
+                        rho_test = noisy_channel.apply(rho)
+
+                        # Trace distance: D(ρ₁, ρ₂) = ½ Tr|ρ₁ - ρ₂|
+                        diff = rho_recon.matrix - rho_test.matrix
+                        eigenvalues = np.linalg.eigvalsh(diff)
+                        distance = 0.5 * np.sum(np.abs(eigenvalues))
+                        total_distance += distance
+
+                    avg_distance = total_distance / len(test_states)
+
+                    if avg_distance < min_distance:
+                        min_distance = avg_distance
+                        best_p = p
+                except:
+                    continue
+
+            estimated_p = best_p
+
+            # Уточняем в окрестности
+            if best_p > 0:
+                p_min = max(0, best_p - 0.05)
+                p_max = min(0.75, best_p + 0.05)
+
+                for p in np.linspace(p_min, p_max, 50):
                     try:
                         noise = DepolarizingChannel(p)
                         noisy_channel = ideal_channel.compose(noise)
 
-                        # Вычисляем среднее расстояние между выходами
                         total_distance = 0.0
                         for rho in test_states:
                             rho_recon = reconstructed_channel.apply(rho)
                             rho_test = noisy_channel.apply(rho)
 
-                            # Trace distance: D(ρ₁, ρ₂) = ½ Tr|ρ₁ - ρ₂|
                             diff = rho_recon.matrix - rho_test.matrix
                             eigenvalues = np.linalg.eigvalsh(diff)
                             distance = 0.5 * np.sum(np.abs(eigenvalues))
@@ -179,53 +206,6 @@ def estimate_error_rates(reconstructed_channel,
 
                         if avg_distance < min_distance:
                             min_distance = avg_distance
-                            best_p = p
-                    except:
-                        continue
-
-                estimated_p = best_p
-
-                # Уточняем в окрестности
-                if best_p > 0:
-                    p_min = max(0, best_p - 0.05)
-                    p_max = min(0.75, best_p + 0.05)
-
-                    for p in np.linspace(p_min, p_max, 50):
-                        try:
-                            noise = DepolarizingChannel(p)
-                            noisy_channel = ideal_channel.compose(noise)
-
-                            total_distance = 0.0
-                            for rho in test_states:
-                                rho_recon = reconstructed_channel.apply(rho)
-                                rho_test = noisy_channel.apply(rho)
-
-                                diff = rho_recon.matrix - rho_test.matrix
-                                eigenvalues = np.linalg.eigvalsh(diff)
-                                distance = 0.5 * np.sum(np.abs(eigenvalues))
-                                total_distance += distance
-
-                            avg_distance = total_distance / len(test_states)
-
-                            if avg_distance < min_distance:
-                                min_distance = avg_distance
-                                estimated_p = p
-                        except:
-                            continue
-
-            else:
-                # Для многокубитных: используем подгонку через fidelity
-                estimated_p = 0.0
-                best_fidelity = 0.0
-
-                for p in np.linspace(0, 0.5, 100):
-                    try:
-                        noise = DepolarizingChannel(p)
-                        noisy_channel = ideal_channel.compose(noise)
-                        F = process_fidelity(reconstructed_channel, noisy_channel)
-
-                        if F > best_fidelity:
-                            best_fidelity = F
                             estimated_p = p
                     except:
                         continue
@@ -261,7 +241,7 @@ def estimate_error_rates(reconstructed_channel,
             "fit_fidelity": fit_fidelity
         }
 
-    elif error_model == 'amplitude_damping' and n_qubits == 1:
+    elif error_model == 'amplitude_damping':
         # Сканируем параметр γ
         best_gamma = 0.0
         best_fidelity = 0.0
@@ -287,7 +267,7 @@ def estimate_error_rates(reconstructed_channel,
 
     else:
         return {
-            "error": f"Модель {error_model} не реализована для {n_qubits} кубитов"
+            "error": f"Модель {error_model} не реализована для 1 кубита"
         }
 
 

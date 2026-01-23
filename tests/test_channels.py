@@ -11,7 +11,6 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from noiselab.channels.noise_models import (
     DepolarizingChannel,
     AmplitudeDampingChannel,
-    BitFlipChannel
 )
 from noiselab.channels.kraus import KrausChannel
 from noiselab.core.states import QuantumState
@@ -88,85 +87,6 @@ class TestAmplitudeDampingChannel:
         expected_prob_1 = 1 - gamma
         assert np.isclose(output.probability(1), expected_prob_1, atol=0.01)
 
-
-
-class TestBitFlipChannel:
-    """Тесты для bit flip"""
-
-    def test_no_flip(self):
-        """Тест p=0: без переворота"""
-        channel = BitFlipChannel(p=0.0)
-
-        state = QuantumState([1, 0], normalize=False).to_density_matrix()
-        output = channel.apply(state)
-
-        assert np.allclose(output.matrix, state.matrix)
-
-    def test_certain_flip(self):
-        """Тест p=1: гарантированный переворот"""
-        channel = BitFlipChannel(p=1.0)
-
-        state = QuantumState([1, 0], normalize=False).to_density_matrix()
-        output = channel.apply(state)
-
-        # |0⟩ → |1⟩
-        assert np.isclose(output.probability(1), 1.0)
-
-
-class TestChannelComposition:
-    """Тесты композиции каналов"""
-
-    def test_sequential_application(self):
-        """Тест последовательного применения каналов"""
-        channel1 = BitFlipChannel(p=0.1)
-        channel2 = DepolarizingChannel(p=0.1)
-
-        # Композиция
-        composed = channel1.compose(channel2)
-
-        # Должен быть валидным CPTP каналом
-        assert composed.validate_cptp()
-
-    def test_channel_power(self):
-        """Тест степени канала: ε∘ε∘...∘ε"""
-        channel = DepolarizingChannel(p=0.1)
-
-        # Применяем 3 раза
-        composed = channel.compose(channel).compose(channel)
-
-        state = QuantumState([1, 0], normalize=False).to_density_matrix()
-
-        # Прямое применение
-        result1 = composed.apply(state)
-
-        # Последовательное применение
-        result2 = channel.apply(channel.apply(channel.apply(state)))
-
-        assert np.allclose(result1.matrix, result2.matrix, atol=1e-10)
-
-
-class TestRandomChannels:
-    """Тесты для случайных каналов"""
-
-    def test_random_cptp_is_valid(self):
-        """Тест: случайный CPTP канал валидный"""
-        from noiselab.channels.random import random_cptp_channel
-
-        channel = random_cptp_channel(n_qubits=1, seed=42)
-
-        # Проверяем хотя бы базовые свойства
-        assert channel.n_qubits == 1
-        assert len(channel.get_kraus_operators()) > 0
-
-    def test_random_cptp_basic(self):
-        """Тест: базовые свойства случайного CPTP канала"""
-        from noiselab.channels.random import random_cptp_channel
-
-        channel = random_cptp_channel(n_qubits=1, seed=42)
-
-        # Проверяем базовые свойства
-        assert channel.n_qubits == 1
-        assert len(channel.get_kraus_operators()) > 0
 
 
 if __name__ == "__main__":

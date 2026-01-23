@@ -7,23 +7,19 @@ from typing import List, Tuple
 from numpy.typing import NDArray
 
 
-def kraus_decomposition(choi_matrix: NDArray[np.complex128],
-                       n_qubits: int) -> List[NDArray[np.complex128]]:
+def kraus_decomposition(choi_matrix: NDArray[np.complex128]) -> List[NDArray[np.complex128]]:
     """
     Разложение Choi matrix в операторы Крауса
 
     J = Σᵢ λᵢ |vᵢ⟩⟨vᵢ|
-    Kᵢ = √λᵢ reshape(|vᵢ⟩, (d, d))
+    Kᵢ = √λᵢ reshape(|vᵢ⟩, (2, 2))
 
     Args:
-        choi_matrix: Choi matrix размера d²×d²
-        n_qubits: Число кубитов
+        choi_matrix: Choi matrix размера 4×4 (для 1 кубита)
 
     Returns:
-        Список операторов Крауса
+        Список операторов Крауса (2×2 матрицы)
     """
-    dim = 2 ** n_qubits
-
     # Диагонализация
     eigenvalues, eigenvectors = np.linalg.eigh(choi_matrix)
 
@@ -39,7 +35,7 @@ def kraus_decomposition(choi_matrix: NDArray[np.complex128],
     for i in range(len(eigenvalues)):
         sqrt_eigenvalue = np.sqrt(eigenvalues[i])
         vec = eigenvectors[:, i]
-        K = sqrt_eigenvalue * vec.reshape(dim, dim)
+        K = sqrt_eigenvalue * vec.reshape(2, 2)
         kraus_operators.append(K)
 
     return kraus_operators
@@ -63,12 +59,8 @@ def minimize_kraus_rank(kraus_operators: List[NDArray[np.complex128]],
     if len(kraus_operators) == 0:
         return []
 
-    dim = kraus_operators[0].shape[0]
-    n_qubits = int(np.log2(dim))
-
     # Строим Choi matrix
-    choi_dim = dim ** 2
-    choi = np.zeros((choi_dim, choi_dim), dtype=np.complex128)
+    choi = np.zeros((4, 4), dtype=np.complex128)
 
     for K in kraus_operators:
         vec_K = K.reshape(-1, 1)
@@ -88,7 +80,7 @@ def minimize_kraus_rank(kraus_operators: List[NDArray[np.complex128]],
     for i in range(len(eigenvalues)):
         sqrt_eigenvalue = np.sqrt(eigenvalues[i])
         vec = eigenvectors[:, i]
-        K = sqrt_eigenvalue * vec.reshape(dim, dim)
+        K = sqrt_eigenvalue * vec.reshape(2, 2)
         minimal_kraus.append(K)
 
     return minimal_kraus
@@ -113,12 +105,9 @@ def analyze_kraus_structure(kraus_operators: List[NDArray[np.complex128]]) -> di
     if len(kraus_operators) == 0:
         return {"error": "Empty operator list"}
 
-    dim = kraus_operators[0].shape[0]
-    n_qubits = int(np.log2(dim))
-
     analysis = {
         "n_operators": len(kraus_operators),
-        "n_qubits": n_qubits,
+        "n_qubits": 1,
         "operators_info": []
     }
 
@@ -134,7 +123,7 @@ def analyze_kraus_structure(kraus_operators: List[NDArray[np.complex128]]) -> di
         K_normalized = K / np.sqrt(weight) if weight > 1e-10 else K
         is_unitary = np.allclose(
             K_normalized.conj().T @ K_normalized,
-            np.eye(dim),
+            np.eye(2),
             atol=1e-8
         )
 
@@ -145,16 +134,15 @@ def analyze_kraus_structure(kraus_operators: List[NDArray[np.complex128]]) -> di
             "is_unitary": is_unitary
         }
 
-        # Для однокубитного случая: разложение по Паули
-        if n_qubits == 1:
-            pauli_decomp = _pauli_decomposition_1q(K)
-            op_info["pauli_decomposition"] = pauli_decomp
+        # Разложение по Паули
+        pauli_decomp = _pauli_decomposition_1q(K)
+        op_info["pauli_decomposition"] = pauli_decomp
 
         analysis["operators_info"].append(op_info)
 
     # Общая проверка: Σᵢ Kᵢ†Kᵢ = I
     sum_kraus = sum(K.conj().T @ K for K in kraus_operators)
-    identity = np.eye(dim, dtype=np.complex128)
+    identity = np.eye(2, dtype=np.complex128)
 
     trace_preserving_error = np.linalg.norm(sum_kraus - identity)
     analysis["trace_preserving_error"] = trace_preserving_error
@@ -210,16 +198,13 @@ def compare_kraus_representations(kraus1: List[NDArray[np.complex128]],
     if len(kraus1) == 0 or len(kraus2) == 0:
         return float('inf')
 
-    dim = kraus1[0].shape[0]
-    choi_dim = dim ** 2
-
     # Строим Choi matrices
-    choi1 = np.zeros((choi_dim, choi_dim), dtype=np.complex128)
+    choi1 = np.zeros((4, 4), dtype=np.complex128)
     for K in kraus1:
         vec_K = K.reshape(-1, 1)
         choi1 += vec_K @ vec_K.conj().T
 
-    choi2 = np.zeros((choi_dim, choi_dim), dtype=np.complex128)
+    choi2 = np.zeros((4, 4), dtype=np.complex128)
     for K in kraus2:
         vec_K = K.reshape(-1, 1)
         choi2 += vec_K @ vec_K.conj().T

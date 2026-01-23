@@ -64,7 +64,7 @@ def trace_distance_states(rho1: NDArray[np.complex128],
 def trace_distance_channels(channel1, channel2,
                             state=None) -> float:
     """
-    Trace distance между каналами для данного состояния
+    Trace distance между каналами для данного состояния (1 кубит)
 
     D(ε₁, ε₂, ρ) = ½ Tr|ε₁(ρ) - ε₂(ρ)|
 
@@ -74,19 +74,16 @@ def trace_distance_channels(channel1, channel2,
     Args:
         channel1: Первый канал
         channel2: Второй канал
-        state: Входное состояние (если None, используется |0...0⟩)
+        state: Входное состояние (если None, используется |0⟩)
 
     Returns:
         Trace distance для данного состояния
     """
     from ..core.states import QuantumState
 
-    if channel1.n_qubits != channel2.n_qubits:
-        raise ValueError("Каналы должны иметь одинаковое число кубитов")
-
     # Входное состояние
     if state is None:
-        state = QuantumState.zero_state(channel1.n_qubits)
+        state = QuantumState.zero_state(1)
 
     rho = state.to_density_matrix()
 
@@ -101,7 +98,7 @@ def trace_distance_channels(channel1, channel2,
 def diamond_distance(channel1, channel2,
                     use_sdp: bool = False) -> float:
     """
-    Diamond distance (diamond norm) между каналами
+    Diamond distance (diamond norm) между каналами (1 кубит)
 
     D◇(ε₁, ε₂) = sup_ρ ½ ||(ε₁ - ε₂) ⊗ I(ρ)||₁
 
@@ -121,8 +118,6 @@ def diamond_distance(channel1, channel2,
     Returns:
         Diamond distance (приближение или точное значение)
     """
-    if channel1.n_qubits != channel2.n_qubits:
-        raise ValueError("Каналы должны иметь одинаковое число кубитов")
 
     if use_sdp:
         try:

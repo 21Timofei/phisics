@@ -9,8 +9,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import numpy as np
 from noiselab.channels.noise_models import DepolarizingChannel
-from noiselab.core.states import DensityMatrix
-from noiselab.core.measurements import PauliMeasurement
+
 from noiselab.tomography.qpt import QuantumProcessTomography
 from noiselab.metrics.fidelity import process_fidelity_choi
 
@@ -141,7 +140,7 @@ def compare_methods():
     print("  • Быстрый, но может дать нефизичный результат")
 
     print("\nЗапуск томографии с LSQ...")
-    qpt_lsq = QuantumProcessTomography(n_qubits=1, shots=2000)
+    qpt_lsq = QuantumProcessTomography(shots=2000)
 
     result_lsq = qpt_lsq.run_tomography(
         channel,
@@ -176,7 +175,7 @@ def compare_methods():
     print("  • Медленнее, но всегда дает физичный канал")
 
     print("\nЗапуск томографии с MLE...")
-    qpt_mle = QuantumProcessTomography(n_qubits=1, shots=2000)
+    qpt_mle = QuantumProcessTomography(shots=2000)
 
     try:
         result_mle = qpt_mle.run_tomography(
@@ -333,7 +332,7 @@ def compare_methods():
         print("  • Readout error: 0.02 (2% ошибка)")
 
         print("\nLSQ с шумом...")
-        qpt_lsq_noisy = QuantumProcessTomography(n_qubits=1, shots=500)
+        qpt_lsq_noisy = QuantumProcessTomography(shots=500)
         result_lsq_noisy = qpt_lsq_noisy.run_tomography(
             channel,
             reconstruction_method='LSQ',
@@ -346,7 +345,7 @@ def compare_methods():
         fidelity_lsq_noisy = process_fidelity_choi(choi_true, choi_lsq_noisy)
 
         print("\nMLE с шумом...")
-        qpt_mle_noisy = QuantumProcessTomography(n_qubits=1, shots=500)
+        qpt_mle_noisy = QuantumProcessTomography(shots=500)
         result_mle_noisy = qpt_mle_noisy.run_tomography(
             channel,
             reconstruction_method='MLE',

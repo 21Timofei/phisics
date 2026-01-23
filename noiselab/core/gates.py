@@ -1,5 +1,5 @@
 """
-Модуль квантовых гейтов
+Модуль квантовых гейтов для 1 кубита
 Реализация унитарных операций с физическими проверками
 """
 
@@ -247,105 +247,6 @@ class RotationGates:
         return QuantumGate(matrix, name=f"P({theta:.3f})", validate=False)
 
 
-class TwoQubitGates:
-    """Двухкубитные гейты"""
-
-    @staticmethod
-    def cnot(control: int = 0, target: int = 1) -> QuantumGate:
-        """
-        Controlled-NOT (CNOT, CX)
-        |control,target⟩ → |control, target ⊕ control⟩
-
-        Матрица для стандартного порядка (control=0, target=1):
-        |00⟩ → |00⟩
-        |01⟩ → |01⟩
-        |10⟩ → |11⟩
-        |11⟩ → |10⟩
-        """
-        if control == target:
-            raise ValueError("Control и target должны быть разными кубитами")
-
-        # Стандартная матрица CNOT для 2 кубитов
-        if control == 0 and target == 1:
-            matrix = np.array([
-                [1, 0, 0, 0],
-                [0, 1, 0, 0],
-                [0, 0, 0, 1],
-                [0, 0, 1, 0]
-            ], dtype=np.complex128)
-        elif control == 1 and target == 0:
-            # CNOT с перевёрнутым порядком
-            matrix = np.array([
-                [1, 0, 0, 0],
-                [0, 0, 0, 1],
-                [0, 0, 1, 0],
-                [0, 1, 0, 0]
-            ], dtype=np.complex128)
-        else:
-            raise ValueError("Для >2 кубитов используйте расширенную версию")
-
-        return QuantumGate(matrix, name=f"CNOT({control},{target})", validate=False)
-
-    @staticmethod
-    def cz() -> QuantumGate:
-        """
-        Controlled-Z
-        Применяет Z к target, если control = |1⟩
-        CZ = diag(1, 1, 1, -1)
-        """
-        matrix = np.array([
-            [1, 0, 0, 0],
-            [0, 1, 0, 0],
-            [0, 0, 1, 0],
-            [0, 0, 0, -1]
-        ], dtype=np.complex128)
-        return QuantumGate(matrix, name="CZ", validate=False)
-
-    @staticmethod
-    def swap() -> QuantumGate:
-        """
-        SWAP gate: меняет местами два кубита
-        |00⟩ → |00⟩, |01⟩ → |10⟩, |10⟩ → |01⟩, |11⟩ → |11⟩
-        """
-        matrix = np.array([
-            [1, 0, 0, 0],
-            [0, 0, 1, 0],
-            [0, 1, 0, 0],
-            [0, 0, 0, 1]
-        ], dtype=np.complex128)
-        return QuantumGate(matrix, name="SWAP", validate=False)
-
-    @staticmethod
-    def controlled_u(u: QuantumGate) -> QuantumGate:
-        """
-        Создать управляемую версию однокубитного гейта
-        CU = |0⟩⟨0| ⊗ I + |1⟩⟨1| ⊗ U
-        """
-        if u.n_qubits != 1:
-            raise ValueError("Можно контролировать только однокубитные гейты")
-
-        I = np.eye(2, dtype=np.complex128)
-        # Блочная матрица 4x4
-        matrix = np.block([
-            [I, np.zeros((2, 2), dtype=np.complex128)],
-            [np.zeros((2, 2), dtype=np.complex128), u.matrix]
-        ])
-        return QuantumGate(matrix, name=f"C-{u.name}", validate=False)
-
-    @staticmethod
-    def iswap() -> QuantumGate:
-        """
-        iSWAP gate: SWAP с дополнительной фазой
-        """
-        matrix = np.array([
-            [1, 0, 0, 0],
-            [0, 0, 1j, 0],
-            [0, 1j, 0, 0],
-            [0, 0, 0, 1]
-        ], dtype=np.complex128)
-        return QuantumGate(matrix, name="iSWAP", validate=False)
-
-
 # Удобные алиасы для часто используемых гейтов
 X = PauliGates.pauli_x
 Y = PauliGates.pauli_y
@@ -359,7 +260,3 @@ Rx = RotationGates.rx
 Ry = RotationGates.ry
 Rz = RotationGates.rz
 U3 = RotationGates.u3
-
-CNOT = TwoQubitGates.cnot
-CZ = TwoQubitGates.cz
-SWAP = TwoQubitGates.swap

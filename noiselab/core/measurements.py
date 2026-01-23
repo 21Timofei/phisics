@@ -97,22 +97,6 @@ class Measurement:
         probs = self.probabilities(rho)
         return np.dot(eigenvalues, probs)
 
-    def post_measurement_state(self, rho: DensityMatrix, outcome: int) -> DensityMatrix:
-        """
-        Состояние после измерения с результатом outcome:
-        ρ' = Πᵢ ρ Πᵢ / P(i)
-        """
-        proj = self.projectors[outcome]
-        new_rho = proj @ rho.matrix @ proj
-
-        prob = np.trace(new_rho).real
-        if prob < 1e-15:
-            raise ValueError(f"Результат {outcome} имеет нулевую вероятность")
-
-        new_rho /= prob
-
-        return DensityMatrix(new_rho, validate=False)
-
     @classmethod
     def computational_basis(cls, n_qubits: int) -> 'Measurement':
         """
@@ -141,16 +125,13 @@ class PauliMeasurement:
     Используется в квантовой томографии
     """
 
-    def __init__(self, basis: str, qubit_index: int = 0, n_qubits: int = 1):
+    def __init__(self, basis: str):
         """
         Args:
             basis: 'X', 'Y' или 'Z'
-            qubit_index: Индекс кубита для измерения
-            n_qubits: Общее число кубитов
         """
         self.basis = basis.upper()
-        self.qubit_index = qubit_index
-        self.n_qubits = n_qubits
+        self.n_qubits = 1
 
         if self.basis not in ['X', 'Y', 'Z']:
             raise ValueError(f"Неизвестный базис: {basis}")
@@ -188,37 +169,10 @@ class PauliMeasurement:
 
     def _create_projectors(self):
         """Создать проекторы для измерения"""
-        single_qubit_projectors = [
+        self.projectors = [
             np.outer(vec, vec.conj())
             for vec in self.eigenvectors
         ]
-
-        if self.n_qubits == 1:
-            self.projectors = single_qubit_projectors
-        else:
-            # Для многокубитного случая: расширяем проекторы тензорным произведением
-            I = np.eye(2, dtype=np.complex128)
-
-            # Проекторы для других кубитов (суммируем по всем базисам)
-            other_identity = np.eye(2 ** (self.n_qubits - 1), dtype=np.complex128)
-
-            self.projectors = []
-            for proj in single_qubit_projectors:
-                if self.qubit_index == 0:
-                    # Проектор действует на первый кубит
-                    full_proj = np.kron(proj, other_identity)
-                elif self.qubit_index == self.n_qubits - 1:
-                    # Проектор действует на последний кубит
-                    full_proj = np.kron(other_identity, proj)
-                else:
-                    # Проектор действует на промежуточный кубит
-                    left_dim = 2 ** self.qubit_index
-                    right_dim = 2 ** (self.n_qubits - self.qubit_index - 1)
-                    I_left = np.eye(left_dim, dtype=np.complex128)
-                    I_right = np.eye(right_dim, dtype=np.complex128)
-                    full_proj = np.kron(np.kron(I_left, proj), I_right)
-
-                self.projectors.append(full_proj)
 
     def measure(self, rho: DensityMatrix, shots: int = 1) -> Dict[str, int]:
         """Провести измерение в базисе Паули"""
@@ -268,98 +222,3 @@ class PauliMeasurement:
         else:
             raise ValueError(f"Неизвестный базис: {basis}")
 
-
-class MeasurementWithNoise:
-    """
-    Измерение с учётом SPAM (State Preparation and Measurement) ошибок
-
-    Модель ошибки считывания:
-    P_measured(i) = (1-εᵢ) P_true(i) + Σⱼ≠ᵢ εⱼᵢ P_true(j)
-
-    Для однокубитного случая:
-    P(measure 0 | true 0) = 1 - ε₀
-    P(measure 1 | true 0) = ε₀
-    P(measure 0 | true 1) = ε₁
-    P(measure 1 | true 1) = 1 - ε₁
-    """
-
-    def __init__(self, ideal_measurement: Measurement,
-                 readout_error: float = 0.0,
-                 confusion_matrix: Optional[NDArray[np.float64]] = None):
-        """
-        Args:
-            ideal_measurement: Идеальное измерение без шума
-            readout_error: Вероятность ошибки считывания (упрощённая модель)
-            confusion_matrix: Матрица переходов P(measured|true) размера n×n
-        """
-        self.ideal_measurement = ideal_measurement
-        self.readout_error = readout_error
-
-        if confusion_matrix is not None:
-            self.confusion_matrix = confusion_matrix
-        else:
-            # Создаём простую симметричную матрицу ошибок
-            n = ideal_measurement.n_outcomes
-            self.confusion_matrix = np.eye(n) * (1 - readout_error)
-            self.confusion_matrix += (readout_error / (n - 1)) * (1 - np.eye(n))
-
-        # Проверка стохастичности
-        if not np.allclose(self.confusion_matrix.sum(axis=0), 1.0, atol=1e-10):
-            raise ValueError("Столбцы матрицы confusion должны суммироваться в 1")
-
-    def measure(self, rho: DensityMatrix, shots: int = 1) -> Dict[str, int]:
-        """Измерение с шумом"""
-        # Истинные вероятности
-        true_probs = self.ideal_measurement.probabilities(rho)
-
-        # Измеренные вероятности после применения ошибок
-        measured_probs = self.confusion_matrix @ true_probs
-        measured_probs = np.clip(measured_probs, 0, 1)
-        measured_probs /= measured_probs.sum()
-
-        # Симуляция измерений
-        outcomes = np.random.choice(
-            self.ideal_measurement.n_outcomes,
-            size=shots,
-            p=measured_probs
-        )
-
-        counts = {label: 0 for label in self.ideal_measurement.labels}
-        for outcome in outcomes:
-            counts[self.ideal_measurement.labels[outcome]] += 1
-
-        return counts
-
-    def mitigate_readout_error(self, noisy_counts: Dict[str, int]) -> Dict[str, int]:
-        """
-        Митигация (исправление) ошибок считывания
-        Решаем: measured = M @ true → true = M⁻¹ @ measured
-        """
-        total_shots = sum(noisy_counts.values())
-
-        # Вектор измеренных частот
-        measured_probs = np.array([
-            noisy_counts.get(label, 0) / total_shots
-            for label in self.ideal_measurement.labels
-        ])
-
-        # Обратная задача: истинные вероятности
-        try:
-            inv_confusion = np.linalg.inv(self.confusion_matrix)
-            true_probs = inv_confusion @ measured_probs
-
-            # Проекция на симплекс (физические вероятности)
-            true_probs = np.clip(true_probs, 0, 1)
-            true_probs /= true_probs.sum()
-
-            # Конвертируем обратно в counts
-            corrected_counts = {
-                label: int(prob * total_shots)
-                for label, prob in zip(self.ideal_measurement.labels, true_probs)
-            }
-
-            return corrected_counts
-
-        except np.linalg.LinAlgError:
-            # Если матрица вырождена, возвращаем исходные данные
-            return noisy_counts

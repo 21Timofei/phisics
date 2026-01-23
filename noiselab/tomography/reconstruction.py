@@ -29,13 +29,12 @@ class LinearInversion:
     Представляем канал в базисе Паули (PTM) или через Choi matrix
     """
 
-    def __init__(self, n_qubits: int):
+    def __init__(self):
         """
-        Args:
-            n_qubits: Число кубитов
+        Линейная инверсия для 1 кубита
         """
-        self.n_qubits = n_qubits
-        self.dim = 2 ** n_qubits
+        self.n_qubits = 1
+        self.dim = 2
 
     def reconstruct_choi(self,
                         input_states: List[DensityMatrix],
@@ -132,20 +131,19 @@ class LinearInversion:
             measurement_results: Результаты паули-измерений {state_idx: {basis: expectation}}
 
         Returns:
-            PTM матрица размера (4^n × 4^n)
+            PTM матрица размера 4×4
         """
         from .state_prep import get_pauli_basis, decompose_in_pauli_basis
 
-        pauli_basis = get_pauli_basis(self.n_qubits)
-        n_paulis = len(pauli_basis)
+        pauli_basis = get_pauli_basis()
 
         # Матрица PTM
-        ptm = np.zeros((n_paulis, n_paulis), dtype=np.float64)
+        ptm = np.zeros((4, 4), dtype=np.float64)
 
         # Для каждого входного состояния
         for state_idx, rho_in in enumerate(input_states):
             # Разложение входного состояния в базисе Паули
-            r_in = decompose_in_pauli_basis(rho_in.matrix, self.n_qubits)
+            r_in = decompose_in_pauli_basis(rho_in.matrix)
 
             # Для каждого паули-измерения
             if state_idx in measurement_results:
@@ -241,13 +239,12 @@ class MaximumLikelihood:
     Используем CVXPY
     """
 
-    def __init__(self, n_qubits: int):
+    def __init__(self):
         """
-        Args:
-            n_qubits: Число кубитов
+        Maximum Likelihood для 1 кубита
         """
-        self.n_qubits = n_qubits
-        self.dim = 2 ** n_qubits
+        self.n_qubits = 1
+        self.dim = 2
 
     def reconstruct(self,
                    input_states: List[DensityMatrix],
@@ -477,7 +474,7 @@ class MaximumLikelihood:
 
         return KrausChannel(
             kraus_operators,
-            n_qubits=self.n_qubits,
+            n_qubits=1,
             name="MLE_reconstructed",
             validate=False
         )
@@ -650,7 +647,7 @@ class MaximumLikelihood:
 
         return KrausChannel(
             kraus_operators,
-            n_qubits=self.n_qubits,
+            n_qubits=1,
             name="MLE_reconstructed",
             validate=False
         )

@@ -12,7 +12,6 @@ from noiselab.channels.noise_models import DepolarizingChannel, AmplitudeDamping
 from noiselab.tomography.qpt import QuantumProcessTomography
 from noiselab.metrics.validation import analyze_tomography_quality, estimate_error_rates
 from noiselab.channels.kraus import KrausChannel
-from noiselab.core.gates import PauliGates
 
 
 def demo_single_qubit_depolarizing():
@@ -31,7 +30,7 @@ def demo_single_qubit_depolarizing():
     print(f"  Ранг Крауса: {unknown_channel.kraus_rank()}")
 
     # 2. Инициализируем QPT
-    qpt = QuantumProcessTomography(n_qubits=1, shots=1000)
+    qpt = QuantumProcessTomography(shots=1000)
 
     print("\n" + "="*70)
     print("ВХОДНЫЕ СОСТОЯНИЯ:")
@@ -96,7 +95,7 @@ def demo_amplitude_damping():
     print(f"\n✓ Создан канал: AmplitudeDamping(γ={true_gamma})")
 
     # QPT
-    qpt = QuantumProcessTomography(n_qubits=1, shots=2000)
+    qpt = QuantumProcessTomography(shots=2000)
 
     print("\n📊 Запуск томографии...")
     result = qpt.run_tomography(unknown_channel, reconstruction_method='LSQ')
@@ -127,7 +126,7 @@ def demo_statistical_analysis():
     print("=" * 70)
 
     unknown_channel = DepolarizingChannel(0.15)
-    qpt = QuantumProcessTomography(n_qubits=1, shots=1000)
+    qpt = QuantumProcessTomography(shots=1000)
 
     print("\n📊 Запуск 10 независимых томографий...")
     results = qpt.run_multiple_tomographies(

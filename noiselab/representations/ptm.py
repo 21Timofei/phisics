@@ -34,19 +34,17 @@ class PauliTransferMatrix:
     R_ij = Tr(σᵢ ε(σⱼ)) / 2^n
     """
 
-    def __init__(self, ptm_matrix: NDArray[np.float64], n_qubits: int):
+    def __init__(self, ptm_matrix: NDArray[np.float64]):
         """
         Args:
-            ptm_matrix: PTM матрица размера (4^n × 4^n)
-            n_qubits: Число кубитов
+            ptm_matrix: PTM матрица размера 4×4 (для 1 кубита)
         """
-        self.n_qubits = n_qubits
-        self.dim = 2 ** n_qubits
+        self.n_qubits = 1
+        self.dim = 2
         self.ptm_matrix = ptm_matrix
 
-        expected_dim = 4 ** n_qubits
-        if ptm_matrix.shape != (expected_dim, expected_dim):
-            raise ValueError(f"Неправильная размерность PTM: {ptm_matrix.shape}")
+        if ptm_matrix.shape != (4, 4):
+            raise ValueError(f"Неправильная размерность PTM: {ptm_matrix.shape}, ожидается (4, 4)")
 
     def is_trace_preserving(self, tol: float = 1e-10) -> bool:
         """
@@ -154,36 +152,24 @@ class PauliTransferMatrix:
         return self.ptm_matrix
 
     @classmethod
-    def from_choi(cls, choi_matrix: NDArray[np.complex128],
-                  n_qubits: int) -> 'PauliTransferMatrix':
+    def from_choi(cls, choi_matrix: NDArray[np.complex128]) -> 'PauliTransferMatrix':
         """
         Создать PTM из Choi matrix
 
-        R_ij = Tr((σᵢ ⊗ I) J (σⱼ ⊗ I)†) * 2^n
+        R_ij = Tr(σᵢ ε(σⱼ)) / 2
 
         Args:
-            choi_matrix: Choi matrix
-            n_qubits: Число кубитов
+            choi_matrix: Choi matrix (4×4)
 
         Returns:
             PauliTransferMatrix
         """
-        pauli_basis = get_pauli_basis(n_qubits)
-        n_paulis = len(pauli_basis)
-        dim = 2 ** n_qubits
+        pauli_basis = get_pauli_basis()
 
-        ptm = np.zeros((n_paulis, n_paulis), dtype=np.float64)
+        ptm = np.zeros((4, 4), dtype=np.float64)
 
-        for i in range(n_paulis):
-            for j in range(n_paulis):
-                # R_ij = Tr(σᵢ ε(σⱼ)) / 2^n
-                # где ε(σⱼ) вычисляется через Choi
-
-                # σⱼ ⊗ I
-                sigma_j_extended = np.kron(pauli_basis[j], np.eye(dim, dtype=np.complex128))
-
-                # (σⱼ ⊗ I) J (σⱼ ⊗ I)† даёт ε(σⱼ) в расширенном пространстве
-                # Упрощённая формула:
+        for i in range(4):
+            for j in range(4):
                 sigma_i = pauli_basis[i]
                 sigma_j = pauli_basis[j]
 
@@ -192,12 +178,12 @@ class PauliTransferMatrix:
 
                 # Действие канала через Choi
                 result_vec = choi_matrix @ vec_j
-                result = result_vec.reshape(dim, dim)
+                result = result_vec.reshape(2, 2)
 
                 # След с σᵢ
-                ptm[i, j] = np.trace(sigma_i @ result).real / dim
+                ptm[i, j] = np.trace(sigma_i @ result).real / 2
 
-        return cls(ptm, n_qubits)
+        return cls(ptm)
 
     @classmethod
     def from_channel(cls, channel) -> 'PauliTransferMatrix':
@@ -205,13 +191,13 @@ class PauliTransferMatrix:
         Создать PTM из квантового канала
 
         Args:
-            channel: QuantumChannel объект
+            channel: QuantumChannel объект (1 кубит)
 
         Returns:
             PauliTransferMatrix
         """
         choi = channel.get_choi_matrix()
-        return cls.from_choi(choi, channel.n_qubits)
+        return cls.from_choi(choi)
 
     def __repr__(self) -> str:
         tp_str = "TP" if self.is_trace_preserving() else "non-TP"

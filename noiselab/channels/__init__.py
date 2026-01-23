@@ -5,11 +5,8 @@ from .noise_models import (
     DepolarizingChannel,
     AmplitudeDampingChannel,
     PhaseDampingChannel,
-    BitFlipChannel,
-    PhaseFlipChannel,
-    GeneralizedAmplitudeDamping
+
 )
-from .random import random_cptp_channel
 
 __all__ = [
     'QuantumChannel',
@@ -17,8 +14,4 @@ __all__ = [
     'DepolarizingChannel',
     'AmplitudeDampingChannel',
     'PhaseDampingChannel',
-    'BitFlipChannel',
-    'PhaseFlipChannel',
-    'GeneralizedAmplitudeDamping',
-    'random_cptp_channel'
 ]

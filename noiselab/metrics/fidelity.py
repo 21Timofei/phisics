@@ -75,16 +75,14 @@ def process_fidelity(channel1, channel2) -> float:
 
 def average_gate_fidelity(channel1, channel2) -> float:
     """
-    Average gate fidelity (средняя верность гейта)
+    Average gate fidelity (средняя верность гейта) для 1 кубита
 
     F_avg = ∫ dψ ⟨ψ|ε₂(ε₁(|ψ⟩⟨ψ|))|ψ⟩
 
     Усреднение по всем чистым состояниям по мере Хаара
 
-    Связь с process fidelity:
-    F_avg = (d·F_proc + 1) / (d + 1)
-
-    где d - размерность системы
+    Связь с process fidelity для 1 кубита:
+    F_avg = (2·F_proc + 1) / 3
 
     Args:
         channel1: Первый канал (обычно идеальный)
@@ -94,28 +92,11 @@ def average_gate_fidelity(channel1, channel2) -> float:
         Average gate fidelity ∈ [0, 1]
     """
     F_proc = process_fidelity(channel1, channel2)
-    d = 2 ** channel1.n_qubits
+    d = 2  # Для 1 кубита
 
     F_avg = (d * F_proc + 1) / (d + 1)
 
     return F_avg
-
-
-def gate_infidelity(channel_ideal, channel_noisy) -> float:
-    """
-    Gate infidelity: r = 1 - F_avg
-
-    Часто используется мера ошибки гейта
-
-    Args:
-        channel_ideal: Идеальный канал
-        channel_noisy: Зашумлённый канал
-
-    Returns:
-        Infidelity ∈ [0, 1]
-    """
-    F = average_gate_fidelity(channel_ideal, channel_noisy)
-    return 1.0 - F
 
 
 def state_fidelity(rho1: NDArray[np.complex128],

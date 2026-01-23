@@ -36,30 +36,37 @@ class DepolarizingChannel(KrausChannel):
 
     def __init__(self, p: float):
         """
+        Инициализация деполяризующего канала
+
         Args:
-            p: Параметр деполяризации (вероятность полного шума)
-        """
+            p: Параметр деполяризации ∈ [0, 4/3]
+               - p=0: идеальный канал (нет шума)
+               - p=0.75 (3/4): максимальный физический шум для 1 кубита
+               - p=1: полностью деполяризующий канал (выход = I/2 для любого входа)
+
+       """
+        # === ВАЛИДАЦИЯ ПАРАМЕТРА ===
         if p < 0:
             raise ValueError(f"Параметр p должен быть неотрицательным: p = {p}")
 
+        # Максимальное физически допустимое значение для 1 кубита
+        # При p > 4/3 коэффициенты операторов Крауса становятся комплексными
         max_p = 4 / 3
         if p > max_p:
             raise ValueError(f"Параметр p слишком большой: p = {p} > {max_p}")
 
         self.p = p
 
-        # Паули матрицы
-        I = np.eye(2, dtype=np.complex128)
+        I = np.eye(2, dtype=np.complex128)        # Единица
         X = np.array([[0, 1], [1, 0]], dtype=np.complex128)
         Y = np.array([[0, -1j], [1j, 0]], dtype=np.complex128)
         Z = np.array([[1, 0], [0, -1]], dtype=np.complex128)
 
-        # Операторы Крауса
         kraus_ops = [
-            np.sqrt(1 - 3*p/4) * I,
-            np.sqrt(p/4) * X,
-            np.sqrt(p/4) * Y,
-            np.sqrt(p/4) * Z
+            np.sqrt(1 - 3*p/4) * I,  # Вероятность "нет ошибки"
+            np.sqrt(p/4) * X,        # Вероятность X-ошибки
+            np.sqrt(p/4) * Y,        # Вероятность Y-ошибки
+            np.sqrt(p/4) * Z         # Вероятность Z-ошибки
         ]
 
         super().__init__(kraus_ops, n_qubits=1,
@@ -163,145 +170,3 @@ class PhaseDampingChannel(KrausChannel):
 
         super().__init__(kraus_ops, n_qubits=1,
                         name=f"PhaseDamping(lambda={lambda_:.4f})", validate=True)
-
-
-class BitFlipChannel(KrausChannel):
-    """
-    Канал переворота бита (Bit Flip)
-
-    С вероятностью p применяется X (NOT), с вероятностью (1-p) ничего
-
-    ε(ρ) = (1-p)ρ + p X ρ X
-
-    Физическая интерпретация:
-    - Классическая ошибка переворота бита
-    - Спонтанный переход |0⟩ ↔ |1⟩
-
-    Операторы Крауса:
-    K₀ = √(1-p) I
-    K₁ = √p X
-    """
-
-    def __init__(self, p: float):
-        """
-        Args:
-            p: Вероятность переворота бита
-        """
-        if not 0 <= p <= 1:
-            raise ValueError(f"Вероятность должна быть в [0, 1]: p = {p}")
-
-        self.p = p
-
-        I = np.eye(2, dtype=np.complex128)
-        X = np.array([[0, 1], [1, 0]], dtype=np.complex128)
-
-        kraus_ops = [
-            np.sqrt(1 - p) * I,
-            np.sqrt(p) * X
-        ]
-
-        super().__init__(kraus_ops, n_qubits=1,
-                        name=f"BitFlip(p={p:.4f})", validate=True)
-
-
-class PhaseFlipChannel(KrausChannel):
-    """
-    Канал переворота фазы (Phase Flip)
-
-    С вероятностью p применяется Z, с вероятностью (1-p) ничего
-
-    ε(ρ) = (1-p)ρ + p Z ρ Z
-
-    Физическая интерпретация:
-    - Случайное изменение знака фазы
-    - Эквивалентно bit flip в базисе X
-
-    Операторы Крауса:
-    K₀ = √(1-p) I
-    K₁ = √p Z
-    """
-
-    def __init__(self, p: float):
-        """
-        Args:
-            p: Вероятность переворота фазы
-        """
-        if not 0 <= p <= 1:
-            raise ValueError(f"Вероятность должна быть в [0, 1]: p = {p}")
-
-        self.p = p
-
-        I = np.eye(2, dtype=np.complex128)
-        Z = np.array([[1, 0], [0, -1]], dtype=np.complex128)
-
-        kraus_ops = [
-            np.sqrt(1 - p) * I,
-            np.sqrt(p) * Z
-        ]
-
-        super().__init__(kraus_ops, n_qubits=1,
-                        name=f"PhaseFlip(p={p:.4f})", validate=True)
-
-
-class GeneralizedAmplitudeDamping(KrausChannel):
-    """
-    Обобщённое амплитудное затухание (Generalized Amplitude Damping)
-
-    Моделирует релаксацию к термическому равновесию при конечной температуре
-
-    Комбинация амплитудного затухания вверх и вниз:
-    - Затухание |1⟩ → |0⟩ с вероятностью γ(1-pₜₕ)
-    - Возбуждение |0⟩ → |1⟩ с вероятностью γpₜₕ
-
-    где pₜₕ = 1/(1 + exp(ΔE/kT)) - тепловая популяция
-
-    Параметры:
-    - γ ∈ [0, 1]: скорость релаксации
-    - p_th ∈ [0, 1]: тепловая популяция возбуждённого состояния
-
-    При p_th = 0 редуцируется к обычному amplitude damping (T=0)
-    """
-
-    def __init__(self, gamma: float, p_th: float):
-        """
-        Args:
-            gamma: Параметр затухания
-            p_th: Тепловая популяция |1⟩
-        """
-        if not 0 <= gamma <= 1:
-            raise ValueError(f"Параметр γ должен быть в [0, 1]: γ = {gamma}")
-        if not 0 <= p_th <= 1:
-            raise ValueError(f"Параметр p_th должен быть в [0, 1]: p_th = {p_th}")
-
-        self.gamma = gamma
-        self.p_th = p_th
-
-        # Четыре оператора Крауса
-        # Затухание с популяцией (1-p_th)
-        K0 = np.sqrt(1 - p_th) * np.array([
-            [1, 0],
-            [0, np.sqrt(1 - gamma)]
-        ], dtype=np.complex128)
-
-        K1 = np.sqrt(1 - p_th) * np.array([
-            [0, np.sqrt(gamma)],
-            [0, 0]
-        ], dtype=np.complex128)
-
-        # Возбуждение с популяцией p_th
-        K2 = np.sqrt(p_th) * np.array([
-            [np.sqrt(1 - gamma), 0],
-            [0, 1]
-        ], dtype=np.complex128)
-
-        K3 = np.sqrt(p_th) * np.array([
-            [0, 0],
-            [np.sqrt(gamma), 0]
-        ], dtype=np.complex128)
-
-        kraus_ops = [K0, K1, K2, K3]
-
-        super().__init__(kraus_ops, n_qubits=1,
-                        name=f"GAD(gamma={gamma:.3f},p_th={p_th:.3f})", validate=True)
-
-

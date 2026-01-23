@@ -1,5 +1,5 @@
 """
-Модуль квантовых состояний
+Модуль квантовых состояний для 1 кубита
 Реализация statevector и density matrix с корректными физическими проверками
 """
 
@@ -199,15 +199,6 @@ class DensityMatrix:
         """Чистота состояния: Tr(ρ²) ∈ [1/d, 1]"""
         return np.trace(self.matrix @ self.matrix).real
 
-    def von_neumann_entropy(self) -> float:
-        """
-        Энтропия фон Неймана: S(ρ) = -Tr(ρ log₂ ρ)
-        S = 0 для чистых состояний
-        """
-        eigenvalues = np.linalg.eigvalsh(self.matrix)
-        # Убираем нулевые собственные значения для избежания log(0)
-        eigenvalues = eigenvalues[eigenvalues > 1e-15]
-        return -np.sum(eigenvalues * np.log2(eigenvalues))
 
     def probability(self, basis_state: int) -> float:
         """Вероятность измерения в базисном состоянии |i⟩: P(i) = ⟨i|ρ|i⟩"""
@@ -266,29 +257,10 @@ class DensityMatrix:
         return f"DensityMatrix(n_qubits={self.n_qubits}, {pure_str}, " \
                f"purity={self.purity():.4f})"
 
-    @classmethod
-    def from_state(cls, state: QuantumState) -> 'DensityMatrix':
-        """Создать из чистого состояния"""
-        return state.to_density_matrix()
 
     @classmethod
     def maximally_mixed(cls, n_qubits: int) -> 'DensityMatrix':
         """Максимально смешанное состояние: ρ = I/d"""
         dim = 2 ** n_qubits
         matrix = np.eye(dim, dtype=np.complex128) / dim
-        return cls(matrix, validate=False)
-
-    @classmethod
-    def thermal_state(cls, n_qubits: int, temperature: float) -> 'DensityMatrix':
-        """
-        Тепловое состояние: ρ = exp(-βH) / Z
-        Для H = ω σ_z (простой гамильтониан)
-        """
-        dim = 2 ** n_qubits
-        # Упрощённая модель: диагональное тепловое состояние
-        energies = np.arange(dim, dtype=np.float64)
-        beta = 1.0 / max(temperature, 1e-10)
-        probabilities = np.exp(-beta * energies)
-        probabilities /= probabilities.sum()
-        matrix = np.diag(probabilities).astype(np.complex128)
         return cls(matrix, validate=False)

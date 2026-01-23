@@ -21,7 +21,6 @@ from core.states import DensityMatrix
 from core.measurements import PauliMeasurement
 from channels.base import QuantumChannel
 from channels.kraus import KrausChannel
-from .state_prep import prepare_tomography_states, get_pauli_basis
 from .reconstruction import LinearInversion, MaximumLikelihood
 
 
@@ -56,86 +55,59 @@ class QuantumProcessTomography:
     5. Валидация и анализ
     """
 
-    def __init__(self, n_qubits: int, shots: int = 1000):
+    def __init__(self, shots: int = 1000):
         """
         Args:
-            n_qubits: Число кубитов (1)
             shots: Число измерений для каждой настройки
         """
 
-        self.n_qubits = n_qubits
-        self.dim = 2 ** n_qubits
+        self.n_qubits = 1
+        self.dim = 2
         self.shots = shots
 
         # Подготовка входных состояний
         # ПРАВИЛЬНЫЙ ПОДХОД: используем базисные операторы {|i⟩⟨j|}
         # вместо произвольных состояний для точной реконструкции Choi matrix
-        self.input_states = self._generate_basis_operators(n_qubits)
+        self.input_states = self._generate_basis_operators()
 
         # Паули-базисы для измерений
         self.measurement_bases = self._prepare_measurement_bases()
 
-        print(f"QPT инициализирована для {n_qubits} кубитов")
+        print(f"QPT инициализирована для 1 кубита")
         print(f"Входных состояний: {len(self.input_states)}")
         print(f"Измерительных базисов: {len(self.measurement_bases)}")
         print(f"Shots на измерение: {shots}")
 
-    def _generate_basis_operators(self, n_qubits: int) -> List[DensityMatrix]:
+    def _generate_basis_operators(self) -> List[DensityMatrix]:
         """
         Генерация информационно-полного набора состояний для QPT
 
         Используем обобщённые состояния Паули, которые образуют полный базис
-        в пространстве операторов. Для d-мерной системы генерируем d² состояний.
+        в пространстве операторов.
 
-        Для 1 кубита используем 4 состояния:
+        Для 1 кубита используем 6 состояний:
         - |0⟩, |1⟩ (вычислительный базис)
         - |+⟩, |-⟩ (базис X)
         - |+i⟩, |-i⟩ (базис Y)
 
-        Args:
-            n_qubits: Число кубитов
-
         Returns:
             Список состояний как DensityMatrix
         """
-        dim = 2 ** n_qubits
         basis_states = []
 
-        if n_qubits == 1:
-            # Для 1 кубита: 4 ортогональных состояния (минимальный полный набор)
-            # Это образует ортонормированный базис в пространстве операторов
+        # Вычислительный базис: |0⟩, |1⟩
+        basis_states.append(DensityMatrix(np.array([[1, 0], [0, 0]], dtype=np.complex128)))
+        basis_states.append(DensityMatrix(np.array([[0, 0], [0, 1]], dtype=np.complex128)))
 
-            # Вычислительный базис: |0⟩, |1⟩
-            basis_states.append(DensityMatrix(np.array([[1, 0], [0, 0]], dtype=np.complex128)))
-            basis_states.append(DensityMatrix(np.array([[0, 0], [0, 1]], dtype=np.complex128)))
+        # X-базис: |+⟩, |-⟩
+        basis_states.append(DensityMatrix(np.array([[0.5, 0.5], [0.5, 0.5]], dtype=np.complex128)))
+        basis_states.append(DensityMatrix(np.array([[0.5, -0.5], [-0.5, 0.5]], dtype=np.complex128)))
 
-            # X-базис: |+⟩, |-⟩
-            basis_states.append(DensityMatrix(np.array([[0.5, 0.5], [0.5, 0.5]], dtype=np.complex128)))
-            basis_states.append(DensityMatrix(np.array([[0.5, -0.5], [-0.5, 0.5]], dtype=np.complex128)))
+        # Y-базис: |+i⟩, |-i⟩
+        basis_states.append(DensityMatrix(np.array([[0.5, -0.5j], [0.5j, 0.5]], dtype=np.complex128)))
+        basis_states.append(DensityMatrix(np.array([[0.5, 0.5j], [-0.5j, 0.5]], dtype=np.complex128)))
 
-            # Y-базис: |+i⟩, |-i⟩
-            basis_states.append(DensityMatrix(np.array([[0.5, -0.5j], [0.5j, 0.5]], dtype=np.complex128)))
-            basis_states.append(DensityMatrix(np.array([[0.5, 0.5j], [-0.5j, 0.5]], dtype=np.complex128)))
-
-            # Примечание: 6 состояний избыточны, но обеспечивают лучшую статистику
-        else:
-            # Для многокубитных: используем тензорные произведения
-            from itertools import product
-
-            # Базисные состояния для 1 кубита
-            single_qubit_basis = [
-                np.array([[1, 0], [0, 0]], dtype=np.complex128),  # |0⟩
-                np.array([[0, 0], [0, 1]], dtype=np.complex128),  # |1⟩
-                np.array([[0.5, 0.5], [0.5, 0.5]], dtype=np.complex128),  # |+⟩
-                np.array([[0.5, -0.5j], [0.5j, 0.5]], dtype=np.complex128),  # |+i⟩
-            ]
-
-            # Генерируем тензорные произведения
-            for combo in product(range(4), repeat=n_qubits):
-                state = single_qubit_basis[combo[0]]
-                for idx in combo[1:]:
-                    state = np.kron(state, single_qubit_basis[idx])
-                basis_states.append(DensityMatrix(state, validate=False))
+        # Примечание: 6 состояний избыточны, но обеспечивают лучшую статистику
 
         return basis_states
 
@@ -143,21 +115,12 @@ class QuantumProcessTomography:
         """
         Подготовить список измерительных базисов
 
-        Для n кубитов: 3^n паули-измерений (X, Y, Z на каждом кубите)
+        Для 1 кубита: 3 паули-измерения (X, Y, Z)
 
         Returns:
-            Список строк типа 'XYZ' для 3 кубитов
+            Список строк ['X', 'Y', 'Z']
         """
-        from itertools import product
-
-        bases = ['X', 'Y', 'Z']
-
-        # Генерируем все комбинации
-        measurement_strings = []
-        for combo in product(bases, repeat=self.n_qubits):
-            measurement_strings.append(''.join(combo))
-
-        return measurement_strings
+        return ['X', 'Y', 'Z']
 
     def run_tomography(self,
                       unknown_channel: QuantumChannel,
@@ -186,7 +149,7 @@ class QuantumProcessTomography:
             rho_out = unknown_channel.apply(rho_in)
             output_states.append(rho_out)
 
-        print(f"✓ Применён канал к {len(output_states)} входным состояниям")
+        print(f"[OK] Применён канал к {len(output_states)} входным состояниям")
 
         # Шаг 2: Измеряем выходные состояния во всех базисах
         measurement_data = []
@@ -206,24 +169,19 @@ class QuantumProcessTomography:
 
             measurement_data.append(state_measurements)
 
-        print(f"✓ Проведено {len(measurement_data) * len(self.measurement_bases)} измерений")
+        print(f"[OK] Проведено {len(measurement_data) * len(self.measurement_bases)} измерений")
 
         # Шаг 3: Реконструкция канала
         if reconstruction_method == 'LSQ':
-            # Для 1 кубита: реконструируем состояния из измерений (state tomography)
-            # Для многих кубитов: используем идеальные выходы (fallback)
-            if self.n_qubits == 1:
-                reconstructed_output_states = self._reconstruct_states_from_measurements(measurement_data)
-                reconstructed = self._reconstruct_lsq(reconstructed_output_states)
-            else:
-                # Fallback: используем идеальные выходы для многокубитных систем
-                reconstructed = self._reconstruct_lsq(output_states)
+            # Реконструируем состояния из измерений (state tomography)
+            reconstructed_output_states = self._reconstruct_states_from_measurements(measurement_data)
+            reconstructed = self._reconstruct_lsq(reconstructed_output_states)
         elif reconstruction_method == 'MLE':
             reconstructed = self._reconstruct_mle(measurement_data)
         else:
             raise ValueError(f"Неизвестный метод: {reconstruction_method}")
 
-        print(f"✓ Канал реконструирован (ранг Крауса: {reconstructed.kraus_rank()})")
+        print(f"[OK] Канал реконструирован (ранг Крауса: {reconstructed.kraus_rank()})")
 
         # Шаг 4: Вычисляем метрики качества
         choi_true = unknown_channel.get_choi_matrix()
@@ -232,7 +190,7 @@ class QuantumProcessTomography:
         from ..metrics.fidelity import process_fidelity_choi
         fidelity = process_fidelity_choi(choi_true, choi_reconstructed)
 
-        print(f"✓ Process fidelity: {fidelity:.6f}")
+        print(f"[OK] Process fidelity: {fidelity:.6f}")
 
         # Формируем результат
         result = QPTResult(
@@ -259,36 +217,16 @@ class QuantumProcessTomography:
 
         Args:
             rho: Квантовое состояние
-            basis_string: Строка базиса, например 'XYZ'
+            basis_string: Строка базиса ('X', 'Y' или 'Z')
             add_noise: Добавлять ли шум
             readout_error: Вероятность ошибки считывания
 
         Returns:
             Словарь с результатами измерений {outcome: count}
         """
-        # Для многокубитного случая нужно измерять каждый кубит отдельно
-        # Упрощённая реализация: измеряем в произведении паули-базисов
-
-        if self.n_qubits == 1:
-            # Однокубитный случай
-            measurement = PauliMeasurement(basis_string, qubit_index=0, n_qubits=1)
-            counts = measurement.measure(rho, shots=self.shots)
-        else:
-            # Многокубитный: измеряем каждый кубит в своём базисе
-            # Получаем результаты для всех кубитов одновременно
-
-            # Упрощение: измеряем в вычислительном базисе после поворота
-            # Сначала применяем базисные повороты
-            rho_rotated = self._rotate_to_measurement_basis(rho, basis_string)
-
-            # Затем измеряем в вычислительном базисе
-            outcomes = rho_rotated.measure(shots=self.shots)
-
-            # Подсчитываем результаты
-            counts = {}
-            for outcome in outcomes:
-                binary = format(outcome, f'0{self.n_qubits}b')
-                counts[binary] = counts.get(binary, 0) + 1
+        # Однокубитный случай
+        measurement = PauliMeasurement(basis_string)
+        counts = measurement.measure(rho, shots=self.shots)
 
         # Добавляем шум измерений если нужно
         if add_noise and readout_error > 0:
@@ -296,45 +234,6 @@ class QuantumProcessTomography:
 
         return counts
 
-    def _rotate_to_measurement_basis(self,
-                                    rho: DensityMatrix,
-                                    basis_string: str) -> DensityMatrix:
-        """
-        Повернуть состояние для измерения в паули-базисе
-
-        Для измерения в базисе X применяем H
-        Для измерения в базисе Y применяем H S†
-        Для измерения в базисе Z ничего не применяем
-
-        Args:
-            rho: Состояние
-            basis_string: Базисы для каждого кубита
-
-        Returns:
-            Повёрнутое состояние
-        """
-        from ..core.gates import PauliGates
-        from ..core.tensor import apply_single_qubit_gate
-
-        # Определяем повороты для каждого кубита
-        rotations = {
-            'X': PauliGates.hadamard().matrix,
-            'Y': (PauliGates.hadamard() @ PauliGates.sdg_gate()).matrix,
-            'Z': PauliGates.identity().matrix
-        }
-
-        # Применяем повороты к каждому кубиту
-        total_rotation = np.eye(self.dim, dtype=np.complex128)
-
-        for qubit_idx, basis in enumerate(basis_string):
-            single_qubit_rot = rotations[basis]
-            full_rotation = apply_single_qubit_gate(single_qubit_rot, qubit_idx, self.n_qubits)
-            total_rotation = full_rotation @ total_rotation
-
-        # Применяем поворот: ρ' = U ρ U†
-        rotated_matrix = total_rotation @ rho.matrix @ total_rotation.conj().T
-
-        return DensityMatrix(rotated_matrix, validate=False)
 
     def _add_readout_noise(self,
                           counts: Dict[str, int],
@@ -386,37 +285,32 @@ class QuantumProcessTomography:
             # ρ = (I + Σᵢ ⟨σᵢ⟩ σᵢ) / 2 для 1 кубита
             # где ⟨σᵢ⟩ - expectation values паули-операторов
 
-            if self.n_qubits == 1:
-                # Извлекаем expectation values из измерений
-                exp_x = self._expectation_from_counts(state_measurements.get('X', {}))
-                exp_y = self._expectation_from_counts(state_measurements.get('Y', {}))
-                exp_z = self._expectation_from_counts(state_measurements.get('Z', {}))
+            # Извлекаем expectation values из измерений
+            exp_x = self._expectation_from_counts(state_measurements.get('X', {}))
+            exp_y = self._expectation_from_counts(state_measurements.get('Y', {}))
+            exp_z = self._expectation_from_counts(state_measurements.get('Z', {}))
 
-                # Реконструируем матрицу плотности
-                # Паули матрицы
-                X = np.array([[0, 1], [1, 0]], dtype=np.complex128)
-                Y = np.array([[0, -1j], [1j, 0]], dtype=np.complex128)
-                Z = np.array([[1, 0], [0, -1]], dtype=np.complex128)
+            # Реконструируем матрицу плотности
+            # Паули матрицы
+            X = np.array([[0, 1], [1, 0]], dtype=np.complex128)
+            Y = np.array([[0, -1j], [1j, 0]], dtype=np.complex128)
+            Z = np.array([[1, 0], [0, -1]], dtype=np.complex128)
 
-                rho_matrix = (np.eye(2) + exp_x * X + exp_y * Y + exp_z * Z) / 2
+            rho_matrix = (np.eye(2) + exp_x * X + exp_y * Y + exp_z * Z) / 2
 
-                # Проверяем физичность и корректируем если нужно
-                # 1. Эрмитовость (уже выполнена по конструкции)
-                # 2. Положительность
-                eigenvalues, eigenvectors = np.linalg.eigh(rho_matrix)
-                eigenvalues = np.maximum(eigenvalues, 0)  # Обрезаем отрицательные
-                rho_matrix = eigenvectors @ np.diag(eigenvalues) @ eigenvectors.conj().T
+            # Проверяем физичность и корректируем если нужно
+            # 1. Эрмитовость (уже выполнена по конструкции)
+            # 2. Положительность
+            eigenvalues, eigenvectors = np.linalg.eigh(rho_matrix)
+            eigenvalues = np.maximum(eigenvalues, 0)  # Обрезаем отрицательные
+            rho_matrix = eigenvectors @ np.diag(eigenvalues) @ eigenvectors.conj().T
 
-                # 3. Нормализация Tr(ρ) = 1
-                trace = np.trace(rho_matrix).real
-                if trace > 1e-10:
-                    rho_matrix = rho_matrix / trace
+            # 3. Нормализация Tr(ρ) = 1
+            trace = np.trace(rho_matrix).real
+            if trace > 1e-10:
+                rho_matrix = rho_matrix / trace
 
-                reconstructed_states.append(DensityMatrix(rho_matrix))
-            else:
-                # Для многокубитного случая: не реализовано
-                # Используется fallback в run_tomography
-                raise NotImplementedError("Многокубитная state tomography не реализована")
+            reconstructed_states.append(DensityMatrix(rho_matrix))
 
         return reconstructed_states
 
@@ -454,7 +348,7 @@ class QuantumProcessTomography:
         """
         Реконструкция методом наименьших квадратов
         """
-        lin_inv = LinearInversion(self.n_qubits)
+        lin_inv = LinearInversion()
         choi = lin_inv.reconstruct_choi(self.input_states, output_states)
         choi = lin_inv._project_to_cptp(choi)
 
@@ -476,7 +370,7 @@ class QuantumProcessTomography:
 
         return KrausChannel(
             kraus_operators,
-            n_qubits=self.n_qubits,
+            n_qubits=1,
             name="LSQ_reconstructed",
             validate=False
         )
@@ -485,16 +379,15 @@ class QuantumProcessTomography:
         """
         Реконструкция методом максимального правдоподобия
         """
-        mle = MaximumLikelihood(self.n_qubits)
+        mle = MaximumLikelihood()
 
         # Преобразуем данные в нужный формат
         # Для упрощения используем измерения в Z-базисе
-        z_basis = 'Z' * self.n_qubits
         simplified_data = []
 
         for state_measurements in measurement_data:
-            if z_basis in state_measurements:
-                simplified_data.append(state_measurements[z_basis])
+            if 'Z' in state_measurements:
+                simplified_data.append(state_measurements['Z'])
             else:
                 # Используем первый доступный базис
                 first_basis = list(state_measurements.keys())[0]

@@ -399,7 +399,7 @@ def main():
                     return
 
                 # Инициализация QPT
-                qpt = QuantumProcessTomography(n_qubits=n_qubits, shots=shots)
+                qpt = QuantumProcessTomography(n_qubits)
 
                 if not run_multiple:
                     # Единичный прогон

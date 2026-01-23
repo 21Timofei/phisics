@@ -21,7 +21,7 @@ class TestQPTBasic:
         """Тест: томография identity канала должна дать высокую fidelity"""
         identity = KrausChannel.from_unitary(np.eye(2), name="Identity")
 
-        qpt = QuantumProcessTomography(n_qubits=1, shots=1000)
+        qpt = QuantumProcessTomography(shots=1000)
         result = qpt.run_tomography(identity, reconstruction_method='LSQ')
 
         # Fidelity должна быть очень высокой
@@ -31,7 +31,7 @@ class TestQPTBasic:
         """Тест: томография деполяризующего канала"""
         channel = DepolarizingChannel(p=0.1)
 
-        qpt = QuantumProcessTomography(n_qubits=1, shots=2000)
+        qpt = QuantumProcessTomography(shots=2000)
         result = qpt.run_tomography(channel, reconstruction_method='LSQ')
 
         # Должна быть хорошая fidelity
@@ -46,7 +46,7 @@ class TestQPTBasic:
         """Тест: томография amplitude damping"""
         channel = AmplitudeDampingChannel(gamma=0.2)
 
-        qpt = QuantumProcessTomography(n_qubits=1, shots=1500)
+        qpt = QuantumProcessTomography(shots=1500)
         result = qpt.run_tomography(channel, reconstruction_method='LSQ')
 
         assert result.process_fidelity > 0.55
@@ -61,7 +61,7 @@ class TestQPTStatistics:
 
         fidelities = []
         for shots in [100, 500, 2000]:
-            qpt = QuantumProcessTomography(n_qubits=1, shots=shots)
+            qpt = QuantumProcessTomography(shots=shots)
             result = qpt.run_tomography(channel, reconstruction_method='LSQ')
             fidelities.append(result.process_fidelity)
 
@@ -72,7 +72,7 @@ class TestQPTStatistics:
     def test_multiple_runs_consistency(self):
         """Тест: множественные прогоны дают близкие результаты"""
         channel = DepolarizingChannel(p=0.15)
-        qpt = QuantumProcessTomography(n_qubits=1, shots=1000)
+        qpt = QuantumProcessTomography(shots=1000)
 
         results = qpt.run_multiple_tomographies(channel, n_runs=5,
                                                reconstruction_method='LSQ')
@@ -89,14 +89,14 @@ class TestStatePreparation:
 
     def test_state_count(self):
         """Тест: правильное число входных состояний"""
-        qpt = QuantumProcessTomography(n_qubits=1, shots=100)
+        qpt = QuantumProcessTomography(shots=100)
 
         # Для 1 кубита должно быть 4 или 6 состояний
         assert len(qpt.input_states) >= 4
 
     def test_measurement_bases(self):
         """Тест: правильное число измерительных базисов"""
-        qpt = QuantumProcessTomography(n_qubits=1, shots=100)
+        qpt = QuantumProcessTomography(shots=100)
 
         # Для 1 кубита: 3 базиса (X, Y, Z)
         assert len(qpt.measurement_bases) == 3
@@ -108,7 +108,7 @@ class TestMetrics:
     def test_cptp_validation(self):
         """Тест: валидация CPTP после томографии"""
         channel = DepolarizingChannel(p=0.1)
-        qpt = QuantumProcessTomography(n_qubits=1, shots=1500)
+        qpt = QuantumProcessTomography(shots=1500)
 
         result = qpt.run_tomography(channel, reconstruction_method='LSQ')
 
@@ -121,7 +121,7 @@ class TestMetrics:
         """Тест: ранг Крауса реконструированного канала"""
         # Depolarizing имеет ранг 4 для 1 кубита
         channel = DepolarizingChannel(p=0.1)
-        qpt = QuantumProcessTomography(n_qubits=1, shots=1000)
+        qpt = QuantumProcessTomography(shots=1000)
 
         result = qpt.run_tomography(channel, reconstruction_method='LSQ')
 
@@ -143,7 +143,7 @@ class TestParameterEstimation:
         channel = DepolarizingChannel(p=true_p)
 
         # Увеличиваем число shots для лучшей статистики
-        qpt = QuantumProcessTomography(n_qubits=1, shots=10000)
+        qpt = QuantumProcessTomography(shots=10000)
         result = qpt.run_tomography(channel, reconstruction_method='LSQ')
 
         identity = KrausChannel.from_unitary(np.eye(2), name="Identity")

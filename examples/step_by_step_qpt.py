@@ -277,17 +277,12 @@ def step_by_step_demo():
     print(f"\nПолучено операторов Крауса: {len(kraus_operators)}")
     print(f"Ранг Крауса: {len(kraus_operators)}")
 
-    # Анализируем структуру операторов
-    analysis = analyze_kraus_structure(kraus_operators)
-
     print(f"\nОператоры Крауса:")
     print("-" * 60)
 
     for i, k in enumerate(kraus_operators):
         print(f"\nK_{i}:")
         print_matrix(k, f"  K_{i}")
-
-
 
 
     print_section("ШАГ 7: Анализ качества реконструкции", 1)
@@ -301,50 +296,11 @@ def step_by_step_demo():
     print(f"   F = Tr(χ_true · χ_reconstructed) = {fidelity:.8f}")
     print(f"   Интерпретация: {fidelity*100:.4f}% перекрытие")
 
-    if fidelity > 0.99:
-        print(f"   ✓ Отличная реконструкция!")
-    elif fidelity > 0.95:
-        print(f"   ✓ Хорошая реконструкция")
-    else:
-        print(f"   ⚠ Требуется улучшение")
 
     # Frobenius distance
     frobenius_dist = np.linalg.norm(choi_true - choi_reconstructed, ord='fro')
     print(f"\n2. Frobenius distance:")
     print(f"   ||χ_true - χ_reconstructed||_F = {frobenius_dist:.8f}")
-
-    if len(kraus_operators) > 0:
-        K0_coeff = np.abs(kraus_operators[0][0, 0])
-        estimated_p = 4 * (1 - K0_coeff**2) / 3
-
-
-    print_section("ФИНАЛЬНЫЙ ОТЧЕТ", 1)
-
-    print("\n" + "=" * 80)
-    print("  СВОДКА РЕЗУЛЬТАТОВ")
-    print("=" * 80)
-
-    print(f"\n1. ИССЛЕДУЕМЫЙ КАНАЛ:")
-    print(f"   Тип: Деполяризующий")
-    print(f"   Параметр: p = {p}")
-
-    print(f"\n2. ТОМОГРАФИЯ:")
-    print(f"   Входных состояний: {len(input_states)}")
-    print(f"   Shots на измерение: {shots}")
-    print(f"   Всего измерений: {len(input_states) * 3 * shots}")
-
-    print(f"\n3. РЕКОНСТРУКЦИЯ:")
-    print(f"   Метод: Linear Inversion (LSQ)")
-    print(f"   Ранг Крауса: {len(kraus_operators)}")
-
-    print(f"\n4. КАЧЕСТВО:")
-    print(f"   Process Fidelity: {fidelity:.8f}")
-    print(f"   Frobenius distance: {frobenius_dist:.8f}")
-
-    print("\n" + "=" * 80)
-    print("  ДЕМОНСТРАЦИЯ ЗАВЕРШЕНА")
-    print("=" * 80 + "\n")
-
 
 if __name__ == "__main__":
     step_by_step_demo()

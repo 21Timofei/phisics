@@ -293,60 +293,10 @@ def step_by_step_demo():
     print(f"  Отрицательных: {np.sum(eigenvalues_raw < -1e-10)}")
     print(f"  Trace: {trace_raw:.6f} (должно быть 2.0)")
 
-    # Проверка Trace Preservation
-    choi_reshaped = choi_raw.reshape(2, 2, 2, 2)
-    partial_trace_raw = np.trace(choi_reshaped.transpose(0, 2, 1, 3).reshape(4, 4))
-    tp_error_raw = np.abs(partial_trace_raw - 2.0)
+    choi_cptp = choi_raw
+    eigenvalues_cptp = eigenvalues_raw
 
-
-
-    print_section("ШАГ 6: Проекция на множество CPTP каналов", 1)
-
-    print("\nЧтобы гарантировать физичность, применяем проекцию на CPTP")
-    print("CPTP = Completely Positive + Trace Preserving")
-
-    needs_projection = (np.any(eigenvalues_raw < -1e-10) or tp_error_raw > 1e-6)
-
-
-
-    print(f"\nШаг 6.1: Применяем проекцию...")
-    choi_cptp = lin_inv._project_to_cptp(choi_raw)
-
-    print_matrix(choi_cptp, "χ (после проекции)")
-
-    # Анализ после проекции
-    eigenvalues_cptp = np.linalg.eigvalsh(choi_cptp)
-    trace_cptp = np.trace(choi_cptp).real
-
-    choi_cptp_reshaped = choi_cptp.reshape(2, 2, 2, 2)
-    partial_trace_cptp = np.trace(choi_cptp_reshaped.transpose(0, 2, 1, 3).reshape(4, 4))
-    tp_error_cptp = np.abs(partial_trace_cptp - 2.0)
-
-    print(f"\nШаг 6.2: Анализ после проекции:")
-    print(f"  Собственные значения: {[f'{ev:.6f}' for ev in eigenvalues_cptp]}")
-    print(f"  Минимальное: {np.min(eigenvalues_cptp):.6e}")
-    print(f"  Отрицательных: {np.sum(eigenvalues_cptp < -1e-10)}")
-    print(f"  Trace: {trace_cptp:.6f}")
-    print(f"  Tr_2(χ) = {partial_trace_cptp:.6f}")
-    print(f"  TP error = {tp_error_cptp:.6e}")
-
-    print(f"\nШаг 6.3: Изменения после проекции:")
-    matrix_change = np.linalg.norm(choi_cptp - choi_raw, ord='fro')
-    eigenvalue_change = np.linalg.norm(eigenvalues_cptp - eigenvalues_raw)
-
-    print(f"  Frobenius distance: {matrix_change:.6e}")
-    print(f"  Изменение собственных значений: {eigenvalue_change:.6e}")
-    print(f"  Изменение TP error: {tp_error_raw:.6e} → {tp_error_cptp:.6e}")
-
-    if matrix_change < 1e-10:
-        print(f"  → Матрица практически не изменилась (уже была физична)")
-    elif matrix_change < 1e-3:
-        print(f"  → Небольшие изменения (хорошие измерения)")
-    else:
-        print(f"  → Значительные изменения (зашумленные измерения)")
-
-
-    print_section("ШАГ 7: Извлечение операторов Крауса", 1)
+    print_section("ШАГ 6: Извлечение операторов Крауса", 1)
 
     print("\nИз Choi matrix извлекаем операторы Крауса через спектральное разложение")
     print("χ = Σᵢ λᵢ |vᵢ⟩⟨vᵢ|  →  Kᵢ = √λᵢ · reshape(|vᵢ⟩, (2,2))")
@@ -385,12 +335,7 @@ def step_by_step_demo():
 
     completeness_error = np.linalg.norm(completeness - np.eye(2))
     print(f"  Ошибка: {completeness_error:.6e}")
-    if completeness_error < 1e-6:
-        print(f"  ✓ Условие полноты выполнено")
-    else:
-        print(f"  ⚠ Условие полноты нарушено")
-
-    print_section("ШАГ 8: Анализ качества реконструкции", 1)
+    print_section("ШАГ 7: Анализ качества реконструкции", 1)
 
     print("\nСравниваем реконструированный канал с истинным")
 
@@ -412,10 +357,6 @@ def step_by_step_demo():
     frobenius_dist = np.linalg.norm(choi_true - choi_cptp, ord='fro')
     print(f"\n2. Frobenius distance:")
     print(f"   ||χ_true - χ_reconstructed||_F = {frobenius_dist:.8f}")
-
-    # Сравнение параметров
-    print(f"\n3. Оценка параметра шума:")
-    print(f"   Истинный p: {p:.6f}")
 
     if len(kraus_operators) > 0:
         K0_coeff = np.abs(kraus_operators[0][0, 0])
@@ -440,7 +381,6 @@ def step_by_step_demo():
     print(f"\n3. РЕКОНСТРУКЦИЯ:")
     print(f"   Метод: Linear Inversion (LSQ)")
     print(f"   Ранг Крауса: {len(kraus_operators)}")
-    print(f"   CPTP проекция: {'Применена' if needs_projection else 'Не требовалась'}")
 
     print(f"\n4. КАЧЕСТВО:")
     print(f"   Process Fidelity: {fidelity:.8f}")
